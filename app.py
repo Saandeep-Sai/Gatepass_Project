@@ -8,9 +8,6 @@ from io import BytesIO
 from datetime import datetime
 from pyzbar import *
 from flask_socketio import SocketIO
-import spacy
-import matplotlib.pyplot as plt
-from io import BytesIO
 import base64
 from werkzeug.utils import secure_filename
 import os
@@ -30,7 +27,7 @@ cred = credentials.Certificate('firebase_config.json')
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-nlp = spacy.load("en_core_web_sm")
+# Spacy removed for deployment optimization
 
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
@@ -52,7 +49,7 @@ def add_cache_control(response):
     return response
 
 def prioritize_text(text):
-    doc = nlp(text.lower())  
+    text_lower = text.lower()
     
     priority_keywords = {
         "urgent": 3,
@@ -83,7 +80,7 @@ def prioritize_text(text):
     priority = 1  
 
     for keyword, weight in priority_keywords.items():
-        if keyword in doc.text:
+        if keyword in text_lower:
             priority = max(priority, weight)
 
     return priority_labels[priority]
@@ -530,68 +527,10 @@ def send_email(subject, sender, recipients, body):
 
 @app.route('/stats', methods=['GET', 'POST'])
 def stats():
-    plot_url1 = None
-    plot_url2 = None
-    if request.method == 'POST':
-        student_id = request.form['student_id']
-
-        requests_docs = db.collection('requests').where('faculty', '==', session.get('username')).stream()
-        date_counts = {}
-        for doc in requests_docs:
-            request_ = doc.to_dict()
-            date = request_['datetime'][0:2] + '-' + request_['datetime'][3:5]
-            current_month = datetime.now().month
-            if int(request_['datetime'][3:5]) == current_month:
-                date_counts[date] = date_counts.get(date, 0) + 1
-
-        dates = list(date_counts.keys())
-        counts = list(date_counts.values())
-
-        plt.bar(dates, counts)
-        plt.xlabel('Date')
-        plt.title('Requests Received by Date')
-        plt.xticks(rotation=45)
-
-        for i in range(len(dates)):
-            plt.text(i, counts[i], str(counts[i]), ha='center', va='bottom')
-
-        plt.yticks([])
-        img = BytesIO()
-        plt.savefig(img, format='png')
-        img.seek(0)
-        plot_url1 = base64.b64encode(img.getvalue()).decode()
-        plt.close()
-
-        requests_docs = db.collection('requests').where('student_id', '==', student_id).stream()
-        date_counts = {}
-        for doc in requests_docs:
-            request_ = doc.to_dict()
-            date = request_['datetime'][0:2] + '-' + request_['datetime'][3:5]
-            date_counts[date] = date_counts.get(date, 0) + 1
-
-        dates = list(date_counts.keys())
-        counts = list(date_counts.values())
-
-        plt.bar(dates, counts, color='orange')
-        plt.xlabel('Date')
-        plt.title('Requests Received by Date for Student ID: {}'.format(student_id))
-        plt.xticks(rotation=45)
-
-        for i in range(len(dates)):
-            plt.text(i, counts[i], str(counts[i]), ha='center', va='bottom')
-
-        plt.yticks([])
-        img = BytesIO()
-        plt.savefig(img, format='png')
-        img.seek(0)
-        plot_url2 = base64.b64encode(img.getvalue()).decode()
-        plt.close()
-
-    return render_template('stats.html', plot_url1=plot_url1, plot_url2=plot_url2)
+    return render_template('stats.html', message="Statistics feature temporarily disabled")
 
 @app.route('/stats2', methods=['GET', 'POST'])
 def stats2():
-    # Student-specific stats removed. Redirecting to faculty/hod stats.
     return redirect(url_for('stats'))
 
 @app.route('/wrong')
