@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security ID QR Code Scanner</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+        
+        header {
+            background: #1a2a6c;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            position: relative;
+        }
+        
+        h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header-icon {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 32px;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 20px;
+        }
+        
+        .panel {
+            flex: 1;
+            min-width: 300px;
+            padding: 20px;
+        }
+        
+        .divider {
+            width: 2px;
+            background: linear-gradient(to bottom, transparent, #1a2a6c, transparent);
+            margin: 0 20px;
+        }
+        
+        h2 {
+            color: #1a2a6c;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #fdbb2d;
+        }
+        
+        .qr-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        #qrcode {
+            display: inline-block;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .scanner-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .scanner {
+            width: 100%;
+            height: 250px;
+            background: #2c3e50;
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 18px;
+        }
+        
+        .scanner::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 4px;
+            background: #fdbb2d;
+            box-shadow: 0 0 20px 5px #fdbb2d;
+            animation: scan 2s linear infinite;
+        }
+        
+        @keyframes scan {
+            0% { top: 0; }
+            50% { top: 100%; }
+            100% { top: 0; }
+        }
+        
+        .scanner-content {
+            z-index: 1;
+            text-align: center;
+        }
+        
+        .scanner-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #fdbb2d;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 25px;
+            background: #1a2a6c;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn:hover {
+            background: #2a3b8c;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn-scan {
+            background: #1a2a6c;
+        }
+        
+        .btn-success {
+            background: #28a745;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: 600;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.denied {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .instructions {
+            background: #fff4e0;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 30px;
+            font-size: 14px;
+        }
+        
+        .instructions ol {
+            padding-left: 20px;
+            margin-top: 10px;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+        }
+        
+        .id-card {
+            background: linear-gradient(135deg, #1a2a6c, #2c3e50);
+            border-radius: 15px;
+            padding: 20px;
+            color: white;
+            margin: 20px 0;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .id-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .id-content {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .id-photo {
+            width: 120px;
+            height: 120px;
+            border-radius: 10px;
+            background: #fdbb2d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: #1a2a6c;
+        }
+        
+        .id-details {
+            flex: 1;
+        }
+        
+        .id-detail {
+            margin-bottom: 10px;
+            display: flex;
+        }
+        
+        .id-label {
+            width: 100px;
+            font-weight: 600;
+        }
+        
+        .scan-history {
+            margin-top: 30px;
+        }
+        
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .history-status {
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+        
+        .verified {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .pending {
+            background: #fff0c2;
+            color: #b38700;
+        }
+        
+        @media (max-width: 768px) {
+            .divider {
+                width: 100%;
+                height: 2px;
+                margin: 20px 0;
+            }
+            
+            .id-content {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Security ID QR Code System</h1>
+            <div class="subtitle">Scan student and faculty security IDs with QR technology</div>
+            <div class="header-icon">
+                <i class="fas fa-id-card"></i>
+            </div>
+        </header>
+        
+        <div class="content">
+            <div class="panel">
+                <h2>Security ID Card</h2>
+                
+                <div class="id-card">
+                    <div class="id-header">
+                        <h3>UNIVERSITY IDENTITY CARD</h3>
+                    </div>
+                    <div class="id-content">
+                        <div class="id-photo">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="id-details">
+                            <div class="id-detail">
+                                <div class="id-label">Name:</div>
+                                <div>Dr. Sarah Johnson</div>
+                            </div>
+                            <div class="id-detail">
+                                <div class="id-label">ID Number:</div>
+                                <div>FAC-78942</div>
+                            </div>
+                            <div class="id-detail">
+                                <div class="id-label">Department:</div>
+                                <div>Computer Science</div>
+                            </div>
+                            <div class="id-detail">
+                                <div class="id-label">Status:</div>
+                                <div>Faculty</div>
+                            </div>
+                            <div class="id-detail">
+                                <div class="id-label">Expires:</div>
+                                <div>Dec 31, 2024</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="qr-container">
+                    <div id="qrcode"></div>
+                    <p style="margin-top: 15px; font-weight: 500;">Scan this QR code to verify identity</p>
+                </div>
+                
+                <div class="instructions">
+                    <h3>How to use:</h3>
+                    <ol>
+                        <li>Present your ID card to security personnel</li>
+                        <li>Security will scan the QR code using the scanner</li>
+                        <li>Your identity will be verified in the system</li>
+                        <li>Security will grant or deny access based on permissions</li>
+                    </ol>
+                </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="panel">
+                <h2>Security Scanner</h2>
+                
+                <div class="scanner-container">
+                    <div class="scanner">
+                        <div class="scanner-content">
+                            <div class="scanner-icon">
+                                <i class="fas fa-camera"></i>
+                            </div>
+                            <p>Point camera at ID QR code</p>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-scan" id="scan-btn">
+                        <i class="fas fa-camera"></i> Simulate Scan
+                    </button>
+                </div>
+                
+                <div class="status" id="status-msg">
+                    <!-- Status message will appear here -->
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-success" id="approve-btn">
+                        <i class="fas fa-check-circle"></i> Grant Access
+                    </button>
+                    <button class="btn btn-danger" id="deny-btn">
+                        <i class="fas fa-times-circle"></i> Deny Access
+                    </button>
+                </div>
+                
+                <div class="scan-history">
+                    <h3>Recent Scans</h3>
+                    <div class="history-item">
+                        <div>Michael Chen (STU-45871)</div>
+                        <div>Today, 09:15</div>
+                        <div><span class="history-status verified">Verified</span></div>
+                    </div>
+                    <div class="history-item">
+                        <div>Emma Williams (STU-33921)</div>
+                        <div>Today, 08:42</div>
+                        <div><span class="history-status verified">Verified</span></div>
+                    </div>
+                    <div class="history-item">
+                        <div>David Brown (FAC-88245)</div>
+                        <div>Today, 08:30</div>
+                        <div><span class="history-status pending">Pending</span></div>
+                    </div>
+                    <div class="history-item">
+                        <div>Jessica Miller (STU-22789)</div>
+                        <div>Yesterday, 17:15</div>
+                        <div><span class="history-status verified">Verified</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Generate QR code
+            const qrElement = document.getElementById('qrcode');
+            const idData = JSON.stringify({
+                id: "FAC-78942",
+                name: "Dr. Sarah Johnson",
+                type: "Faculty",
+                department: "Computer Science",
+                expires: "2024-12-31",
+                access: "Labs A, B, C; Research Wing"
+            });
+            
+            QRCode.toCanvas(qrElement, idData, {
+                width: 200,
+                margin: 1,
+                color: {
+                    dark: "#1a2a6c",
+                    light: "#ffffff"
+                }
+            }, function(error) {
+                if (error) console.error(error);
+            });
+            
+            // Get DOM elements
+            const scanBtn = document.getElementById('scan-btn');
+            const approveBtn = document.getElementById('approve-btn');
+            const denyBtn = document.getElementById('deny-btn');
+            const statusMsg = document.getElementById('status-msg');
+            
+            // Simulate scan button click
+            scanBtn.addEventListener('click', function() {
+                statusMsg.className = 'status';
+                statusMsg.textContent = 'ID scanned successfully. Faculty member: Dr. Sarah Johnson. Please verify and take action.';
+                statusMsg.classList.add('success');
+                
+                // Enable action buttons
+                approveBtn.disabled = false;
+                denyBtn.disabled = false;
+            });
+            
+            // Approve button click
+            approveBtn.addEventListener('click', function() {
+                statusMsg.textContent = 'Access GRANTED. Dr. Sarah Johnson has been granted access to permitted areas.';
+                statusMsg.className = 'status success';
+                
+                // Disable buttons after action
+                approveBtn.disabled = true;
+                denyBtn.disabled = true;
+                
+                // Add to history
+                addToHistory("Dr. Sarah Johnson (FAC-78942)", "verified");
+            });
+            
+            // Deny button click
+            denyBtn.addEventListener('click', function() {
+                statusMsg.textContent = 'Access DENIED. Security team has been notified.';
+                statusMsg.className = 'status denied';
+                
+                // Disable buttons after action
+                approveBtn.disabled = true;
+                denyBtn.disabled = true;
+                
+                // Add to history
+                addToHistory("Dr. Sarah Johnson (FAC-78942)", "pending");
+            });
+            
+            // Initially disable action buttons
+            approveBtn.disabled = true;
+            denyBtn.disabled = true;
+            
+            // Function to add to scan history
+            function addToHistory(name, status) {
+                const history = document.querySelector('.scan-history');
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                
+                const now = new Date();
+                const timeString = `Today, ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                
+                historyItem.innerHTML = `
+                    <div>${name}</div>
+                    <div>${timeString}</div>
+                    <div><span class="history-status ${status}">${status.charAt(0).toUpperCase() + status.slice(1)}</span></div>
+                `;
+                
+                history.insertBefore(historyItem, history.firstChild);
+            }
+        });
+    </script>
+</body>
+</html>

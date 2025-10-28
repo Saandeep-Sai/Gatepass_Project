@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Dashboard - Gate Pass Scanner</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .scanner-container {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        #reader {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 5px;
+        }
+        
+        .btn-primary {
+            background-color: #2575fc;
+            color: white;
+        }
+        
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        
+        .status-valid {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .status-used {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Security Dashboard - Gate Pass Scanner</h1>
+        <a href="/logout" style="color: white; text-decoration: none;">Logout</a>
+    </div>
+    
+    <div class="container">
+        <div class="card">
+            <h2>QR Code Scanner</h2>
+            <div class="scanner-container">
+                <div id="reader"></div>
+                <button class="btn btn-primary" id="startScan">Start Scanner</button>
+                <button class="btn btn-danger" id="stopScan" style="display:none;">Stop Scanner</button>
+            </div>
+            <div id="scanResult"></div>
+        </div>
+        
+        <div class="card">
+            <h2>Today's Checkout Log</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Student ID</th>
+                        <th>Name</th>
+                        <th>Reason</th>
+                        <th>Checkout Time</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="checkoutLog">
+                    {% for log in checkout_logs %}
+                    <tr>
+                        <td>{{ log.student_id }}</td>
+                        <td>{{ log.name }}</td>
+                        <td>{{ log.reason }}</td>
+                        <td>{{ log.checkouttime }}</td>
+                        <td><span class="status-used">Used</span></td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align:center;">No checkouts today</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let html5QrCode;
+        
+        document.getElementById('startScan').addEventListener('click', function() {
+            html5QrCode = new Html5Qrcode("reader");
+            
+            // Try to get rear camera on mobile
+            Html5Qrcode.getCameras().then(cameras => {
+                if (cameras && cameras.length) {
+                    // Use rear camera if available (usually last camera on mobile)
+                    const cameraId = cameras.length > 1 ? cameras[cameras.length - 1].id : cameras[0].id;
+                    
+                    html5QrCode.start(
+                        cameraId,
+                        {
+                            fps: 10,
+                            qrbox: { width: 250, height: 250 },
+                            aspectRatio: 1.0
+                        },
+                        onScanSuccess,
+                        onScanError
+                    ).then(() => {
+                        document.getElementById('startScan').style.display = 'none';
+                        document.getElementById('stopScan').style.display = 'inline-block';
+                    }).catch(err => {
+                        alert('Unable to start camera: ' + err);
+                    });
+                }
+            }).catch(err => {
+                alert('Error getting cameras: ' + err);
+            });
+        });
+        
+        document.getElementById('stopScan').addEventListener('click', function() {
+            html5QrCode.stop().then(() => {
+                document.getElementById('startScan').style.display = 'inline-block';
+                document.getElementById('stopScan').style.display = 'none';
+            });
+        });
+        
+        function onScanSuccess(decodedText, decodedResult) {
+            // Stop scanning after successful scan
+            html5QrCode.stop();
+            document.getElementById('startScan').style.display = 'inline-block';
+            document.getElementById('stopScan').style.display = 'none';
+            
+            // Extract key from URL - matches both full URL and just the key
+            const urlMatch = decodedText.match(/verifyqr\/(\d+)/);
+            if (urlMatch) {
+                const key = urlMatch[1];
+                validateAndCheckout(key);
+            } else if (/^\d{6}$/.test(decodedText)) {
+                // If it's just a 6-digit key
+                validateAndCheckout(decodedText);
+            } else {
+                showResult('Invalid QR code format: ' + decodedText, 'error');
+            }
+        }
+        
+        function onScanError(errorMessage) {
+            // Ignore scan errors
+        }
+        
+        function validateAndCheckout(key) {
+            showResult('Validating QR code...', 'success');
+            
+            fetch(`/security/validate-qr/${key}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showResult(`✓ VALID PASS<br>Student: ${data.name}<br>ID: ${data.student_id}<br>Reason: ${data.reason}<br><br>Checked out successfully!`, 'success');
+                    // Reload page to update log after 3 seconds
+                    setTimeout(() => location.reload(), 3000);
+                } else {
+                    showResult(`✗ INVALID<br>${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showResult('✗ Error validating QR code. Please try again.', 'error');
+            });
+        }
+        
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('scanResult');
+            resultDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+        }
+    </script>
+</body>
+</html>

@@ -1,8 +1,8 @@
 from flask import *
-from flask_pymongo import PyMongo
+import firebase_admin
+from firebase_admin import credentials, firestore
 from flask_session import Session
 import random
-from bson import ObjectId
 import qrcode
 from io import BytesIO
 from datetime import datetime
@@ -23,10 +23,13 @@ socketio = SocketIO(app)
 UPLOAD_FOLDER = 'photos'
 ALLOWED_EXTENSIONS = {'jpg'}
 
-app.config['MONGO_URI'] = 'mongodb+srv://pingalipraneeth1:DgCwSk9Cn9mTx32a@augatepass.1dvhlzv.mongodb.net/gatepass_db?retryWrites=true&w=majority'
-app.config['SECRET_KEY'] = 'your_secret_key'  
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your_secret_key_change_in_production')  
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-mongo = PyMongo(app)
+
+cred = credentials.Certificate('firebase_config.json')
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+
 nlp = spacy.load("en_core_web_sm")
 
 app.config["SESSION_PERMANENT"] = False
@@ -91,11 +94,13 @@ def login():
     if session.get("login_type"):
         if (session["login_type"] == 'wrong'):
             return redirect('/wrong')
-        if (session["login_type"] == "student"):
-            return redirect(url_for('student'))
-        if (session["login_type"] == "faculty"):
+        elif (session["login_type"] == "faculty"):
             return redirect(url_for('faculty'))
-        if (session["login_type"] == "security"):
+        elif (session["login_type"] == "faculty"):
+            return redirect(url_for('faculty'))
+        elif (session["login_type"] == "hod"):
+            return redirect(url_for('hod'))
+        elif (session["login_type"] == "security"):
             return redirect(url_for('security'))
 
     if request.method == 'POST':
@@ -106,24 +111,31 @@ def login():
         session["login_type"] = request.form['login_type']
 
         user_data = None
-        if login_type == 'student':
-            user_data = mongo.db.studentdata.find_one({'username': username, 'password': password})
-            user = mongo.db.students.find_one({'username': username})
+        # Only faculty, hod and security logins are allowed now
+        if login_type == 'faculty':
+            users = db.collection('facultydata').where('username', '==', username).where('password', '==', password).limit(1).stream()
+            user_data = next(users, None)
             if user_data:
-                session['name'] = user.get('name', '')
-                fac=mongo.db.students.find_one({'username': session['username']})
-                session['mentor'] = fac.get("faculty")
-        elif login_type == 'faculty':
-            user_data = mongo.db.facultydata.find_one({'username': username, 'password': password})
+                user_doc = db.collection('faculty').where('emp_id', '==', username).limit(1).stream()
+                user = next(user_doc, None)
+                if user:
+                    session['name'] = user.to_dict().get('name', '')
+        elif login_type == 'hod':
+            users = db.collection('hoddata').where('username', '==', username).where('password', '==', password).limit(1).stream()
+            user_data = next(users, None)
         elif login_type == 'security':
-            user_data = mongo.db.securitydata.find_one({'username': username, 'password': password})
+            users = db.collection('securitydata').where('username', '==', username).where('password', '==', password).limit(1).stream()
+            user_data = next(users, None)
+        else:
+            # student or other roles are no longer supported
+            user_data = None
 
         if user_data:
             session['login_type'] = login_type
-            if login_type == 'student':
-                return redirect(url_for('student'))
-            elif login_type == 'faculty':
+            if login_type == 'faculty':
                 return redirect(url_for('faculty'))
+            elif login_type == 'hod':
+                return redirect(url_for('hod'))
             elif login_type == 'security':
                 return redirect(url_for('security'))
         else:
@@ -146,6 +158,32 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+@app.route('/api/faculty-list')
+def get_faculty_list():
+    faculty_docs = db.collection('facultydata').stream()
+    faculty_list = [{'username': doc.to_dict().get('username')} for doc in faculty_docs]
+    return jsonify(faculty_list)
+
+@app.route('/api/faculty/requests')
+def get_faculty_requests():
+    if 'login_type' not in session or session['login_type'] != 'hod':
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    current_date = datetime.now().date().strftime('%d-%m-%Y')
+    
+    all_requests = db.collection('requests').where('type', '==', 'faculty').stream()
+    all_requests_list = [{'_id': doc.id, **doc.to_dict()} for doc in all_requests]
+    
+    faculty_pending = [r for r in all_requests_list if r.get('status') == 'Pending']
+    faculty_approved = [r for r in all_requests_list if r.get('status') == 'Approved' and r.get('datetime') == current_date]
+    faculty_denied = [r for r in all_requests_list if r.get('status') == 'Denied' and r.get('datetime') == current_date]
+    
+    return jsonify({
+        'faculty_pending': faculty_pending,
+        'faculty_approved': faculty_approved,
+        'faculty_denied': faculty_denied
+    })
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -154,71 +192,48 @@ def register():
         login_type = request.form['login_type']
         photo = request.files['photo']
 
-        # Check if the photo has been uploaded
         if photo.filename == '':
-            return "No selected file"
+            flash('No file selected. Please upload a photo.', 'error')
+            return redirect(url_for('register'))
         if photo and allowed_file(photo.filename):
             filename = secure_filename(photo.filename)
-            # Rename the file to the username before saving
             filename = secure_filename(username) + os.path.splitext(filename)[1]
             photo.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         else:
-            return "Unsupported file format. Please upload an image."
+            flash('Unsupported file format. Please upload a JPG image.', 'error')
+            return redirect(url_for('register'))
 
-        existing_user = None
-        if login_type == 'student':
-            existing_user = mongo.db.studentdata.find_one({'username': username})
-        elif login_type == 'faculty':
-            existing_user = mongo.db.facultydata.find_one({'username': username})
-        elif login_type == 'security':
-            existing_user = mongo.db.securitydata.find_one({'username': username})
+        existing_user = next(db.collection(f'{login_type}data').where('username', '==', username).limit(1).stream(), None)
         if existing_user:
-            return "Username already exists. Please choose a different username."
-        if login_type == 'student':
-            mongo.db.studentdata.insert_one({'username': username, 'password': password, 'photo': filename})
-        elif login_type == 'faculty':
-            mongo.db.facultydata.insert_one({'username': username, 'password': password, 'photo': filename})
+            flash('Username already exists. Please choose a different username.', 'error')
+            return redirect(url_for('register'))
+
+        if login_type == 'faculty':
+            db.collection('facultydata').add({'username': username, 'password': password, 'photo': filename})
         elif login_type == 'security':
-            mongo.db.securitydata.insert_one({'username': username, 'password': password, 'photo': filename})
-        return "Registration successful. You can now log in."
+            db.collection('securitydata').add({'username': username, 'password': password, 'photo': filename})
+        else:
+            flash('Invalid registration type.', 'error')
+            return redirect(url_for('register'))
+
+        flash('Registration successful! You can now log in.', 'success')
+        return redirect(url_for('login'))
 
     return render_template('register.html')
 
-@app.route('/student', methods=['GET', 'POST'])
-def student():
-    if 'login_type' not in session or session['login_type'] != 'student':
-        return redirect(url_for('login'))
-
-    if request.method == 'POST':
-        student_id = session['username']
-        name = session['name']
-        reason = request.form['reason']
-        priority = prioritize_text(reason)
-        current_date = datetime.now().date().strftime('%d-%m-%Y')
-        fac=mongo.db.students.find_one({'username': session['username']})
-        facc=fac.get("faculty")
-        checkk="False"
-        mongo.db.requests.insert_one({'student_id': student_id, 'name': name, 'reason': reason, 'status': 'Pending', 'datetime': current_date, 'priority': priority, 'faculty': facc, 'checkedout': checkk, 'checkouttime': "Null"})
-        subject = "New GatePass Request"
-        sender = "poppingaming1@gmail.com"
-        recipients = ["pingalipraneeth1@gmail.com"]
-        body = f"New Gatepass request from '{name}' '{student_id}'."
-        send_email(subject, sender, recipients, body)
-        return redirect(url_for('student'))
-
-    return render_template('student.html')
+# Student functionality removed per client request. Students no longer submit or view requests.
 
 @app.route('/photos/<path:filename>')
 def photos(filename):
-    if filename=="20EG112331.jpg":
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if os.path.exists(file_path):
         return send_from_directory('photos', filename)
     else:
-        filename="person.jpg"
-        return send_from_directory('photos', 'person.jpg')
+        abort(404)
 
-@app.route('/faculty', methods=['GET', 'POST'])
-def faculty():
-    if 'login_type' not in session or session['login_type'] != 'faculty':
+@app.route('/hod', methods=['GET', 'POST'])
+def hod():
+    if 'login_type' not in session or session['login_type'] != 'hod':
         return redirect(url_for('login'))
 
     if request.method == 'POST':
@@ -227,66 +242,172 @@ def faculty():
 
         if action == 'allow':
             random_key = str(random.randint(100000, 999999))
-            mongo.db.requests.update_one({'_id': ObjectId(request_id)}, {'$set': {'status': 'Approved', 'key': random_key}})
-        
+            generated_at = datetime.now().isoformat()
+            db.collection('requests').document(request_id).update({'status': 'Approved', 'key': random_key, 'generated_at': generated_at})
         elif action == 'deny':
-            mongo.db.requests.update_one({'_id': ObjectId(request_id)}, {'$set': {'status': 'Denied', 'key': None}})
+            db.collection('requests').document(request_id).update({'status': 'Denied', 'key': None})
+        
+        return redirect(url_for('hod'))
+
+    current_date = datetime.now().date().strftime('%d-%m-%Y')
+    
+    # Fetch faculty requests only
+    all_requests = db.collection('requests').where('type', '==', 'faculty').stream()
+    all_requests_list = [{'_id': doc.id, **doc.to_dict()} for doc in all_requests]
+    
+    faculty_pending = [r for r in all_requests_list if r.get('status') == 'Pending']
+    faculty_approved = [r for r in all_requests_list if r.get('status') == 'Approved' and r.get('datetime') == current_date]
+    faculty_denied = [r for r in all_requests_list if r.get('status') == 'Denied' and r.get('datetime') == current_date]
+    
+    total_faculty_docs = db.collection('faculty').stream()
+    total_faculty = [doc.to_dict() for doc in total_faculty_docs]
+
+    return render_template('hod.html', 
+                         faculty_pending=faculty_pending,
+                         faculty_approved=faculty_approved,
+                         faculty_denied=faculty_denied,
+                         total_faculty=total_faculty)
+
+@app.route('/faculty', methods=['GET', 'POST'])
+def faculty():
+    if 'login_type' not in session or session['login_type'] != 'faculty':
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        try:
+            faculty_id = session['username']
+            name = session.get('name', faculty_id)
+            reason = request.form.get('reason', '')
+            
+            if not reason:
+                flash('Please provide a reason for your request.', 'error')
+                return redirect(url_for('faculty'))
+            
+            priority = prioritize_text(reason)
+            current_date = datetime.now().date().strftime('%d-%m-%Y')
+            
+            request_data = {
+                'student_id': faculty_id,
+                'name': name,
+                'reason': reason,
+                'status': 'Pending',
+                'datetime': current_date,
+                'priority': priority,
+                'faculty': 'hod',
+                'checkedout': False,
+                'checkouttime': None,
+                'type': 'faculty'
+            }
+            
+            db.collection('requests').add(request_data)
+            print(f"Faculty request saved: {request_data}")
+            flash('Request submitted successfully!', 'success')
+        except Exception as e:
+            print(f"Error saving faculty request: {e}")
+            flash('Error submitting request. Please try again.', 'error')
         
         return redirect(url_for('faculty'))
-    
 
-    requests = mongo.db.requests.find({'status': 'Pending', 'faculty': session['username']})
+    faculty_id = session['username']
+    requests_docs = db.collection('requests').where('student_id', '==', faculty_id).stream()
+    requests = [{'id': doc.id, **doc.to_dict()} for doc in requests_docs]
+    current_date = datetime.now().date().strftime('%d-%m-%Y')
+    approved_requests = [req for req in requests if req.get('status') == 'Approved' and req.get('datetime') == current_date]
 
-    return render_template('faculty.html', requests=requests)
+    return render_template('faculty_dashboard.html', requests=requests, approved_requests=approved_requests)
 
 @app.route('/security', methods=['GET', 'POST'])
 def security():
     if 'login_type' not in session or session['login_type'] != 'security':
         return redirect(url_for('login'))
 
-    if request.method == 'POST':
-        if request.form['action'] == 'entry':
+    # Get today's checkout logs
+    current_date = datetime.now().date().strftime('%d-%m-%Y')
+    checkout_logs_docs = db.collection('requests').where('checkedout', '==', True).where('datetime', '==', current_date).stream()
+    checkout_logs = [doc.to_dict() for doc in checkout_logs_docs]
 
-            name = request.form['name']
-            reason = request.form['reason']
-            number = request.form['number']
-            current_datetime = datetime.now().strftime('%d-%m-%Y %H:%M:%S')
-            mongo.db.visitors.insert_one({'name': name, 'reason': reason, 'number': number, 'datetime': current_datetime, 'checkout': False})
+    return render_template('security_dashboard.html', checkout_logs=checkout_logs)
 
-            return redirect(url_for('security'))
+@app.route('/security/validate-qr/<key>', methods=['POST'])
+def validate_qr(key):
+    current_date = datetime.now().date().strftime('%d-%m-%Y')
+    current_time = datetime.now()
 
-    return render_template('security.html')
+    request_doc = next(db.collection('requests').where('key', '==', key).limit(1).stream(), None)
+
+    if not request_doc:
+        return jsonify({'success': False, 'message': 'Invalid QR code'})
+
+    request_data = request_doc.to_dict()
+
+    if request_data.get('status') != 'Approved':
+        return jsonify({'success': False, 'message': 'Pass not approved'})
+
+    if request_data.get('checkedout') == True:
+        return jsonify({'success': False, 'message': 'QR code already used'})
+
+    if request_data.get('datetime') != current_date:
+        return jsonify({'success': False, 'message': 'QR code expired'})
+
+    # Compute scanned_at and duration (seconds) relative to generated_at
+    generated_at_str = request_data.get('generated_at')
+    scanned_at = current_time.isoformat()
+    duration_seconds = None
+    if generated_at_str:
+        try:
+            gen_dt = datetime.fromisoformat(generated_at_str)
+            duration_seconds = (current_time - gen_dt).total_seconds()
+        except Exception:
+            duration_seconds = None
+
+    # Mark as checked out and save scanned time and duration
+    update_fields = {
+        'checkedout': True,
+        'checkouttime': current_time.strftime('%H:%M:%S'),
+        'scanned_at': scanned_at
+    }
+    if duration_seconds is not None:
+        update_fields['duration_seconds'] = duration_seconds
+
+    db.collection('requests').document(request_doc.id).update(update_fields)
+
+    return jsonify({
+        'success': True,
+        'name': request_data.get('name'),
+        'student_id': request_data.get('student_id'),
+        'reason': request_data.get('reason'),
+        'scanned_at': scanned_at,
+        'duration_seconds': duration_seconds
+    })
 
 @app.route('/security/visitors_log')
 def visitors_log():
-    if 'login_type' not in session or session['login_type'] not in ['student', 'faculty', 'security']:
+    if 'login_type' not in session or session['login_type'] not in ['faculty', 'security']:
         return redirect(url_for('login'))
-    visitors = mongo.db.visitors.find()
+    visitors = db.collection('visitors').stream()
+    visitors_list = [{'id': doc.id, **doc.to_dict()} for doc in visitors]
 
-    return render_template('visitors_log.html', visitors=visitors)
+    return render_template('visitors_log.html', visitors=visitors_list)
 
 @app.route('/security/checkout/<visitor_id>', methods=['POST'])
 def checkout_visitor(visitor_id):
     checkout_time = datetime.now()
-    mongo.db.visitors.update_one(
-        {'_id': ObjectId(visitor_id)},
-        {'$set': {'checkout': True, 'checkout_time': checkout_time}}
-    )
+    db.collection('visitors').document(visitor_id).update({'checkout': True, 'checkout_time': checkout_time})
     return redirect(url_for('visitors_log'))
 
 @app.route('/view_requests', methods=['GET', 'POST'])
 def view_requests():
-    
-        student_id = session['username']
-        requests = list(mongo.db.requests.find({'student_id': student_id}))
-        current_date = datetime.now().date().strftime('%d-%m-%Y')
-        
-        approved_requests = [req for req in requests if req['status'] == 'Approved' and req['datetime'] == current_date]
-
-        return render_template('view_requests.html', student_id=student_id, requests=requests, approved_requests=approved_requests)  
+    # Student request view removed. This endpoint is deprecated.
+    return redirect(url_for('hod'))
 
 @app.route('/generate_qr/<key>')
 def generate_qr(key):
+    # Validate that the key belongs to an approved request in Firestore
+    request_ref = db.collection('requests').where('key', '==', key).where('status', '==', 'Approved').limit(1)
+    docs = list(request_ref.stream())
+    if not docs:
+        return "Invalid or unauthorized QR code generation. Request must be approved first.", 403
+
     qr_url = f"https://augatepass.onrender.com/verifyqr/{key}"
     qr = qrcode.QRCode(
         version=1,
@@ -301,18 +422,41 @@ def generate_qr(key):
     img_io = BytesIO()
     img.save(img_io)
     img_io.seek(0)
+    # Convert image to base64
+    qr_base64 = base64.b64encode(img_io.getvalue()).decode('utf-8')
+
+    # Save QR code base64 to Firestore under the request document
+    doc_id = docs[0].id
+    db.collection('requests').document(doc_id).update({'qr_base64': qr_base64})
 
     return send_file(img_io, mimetype='image/png')
 
 @app.route('/verifyqr/<key>')
 def verify_qr(key):
     current_date = datetime.now().date().strftime('%d-%m-%Y')
-    request_data = mongo.db.requests.find_one({'key': key, 'status': 'Approved', 'checkedout': 'False', 'datetime': current_date})
-    
-    if request_data:
-        return render_template('verify_qr.html', key=request_data['key'],student_id=request_data['student_id'], name=request_data['name'], reason=request_data['reason'], datetime=request_data['datetime'])
-    else:
-        return render_template('verify_qr_error.html', message='Invalid QR code, used , expired or request not approved')
+    request_doc = next(db.collection('requests').where('key', '==', key).limit(1).stream(), None)
+
+    if not request_doc:
+        return render_template('verify_qr_error.html', message='Invalid QR code. Request not found.')
+
+    request_data = request_doc.to_dict()
+
+    if request_data.get('status') != 'Approved':
+        return render_template('verify_qr_error.html', message='QR code not valid. Request has not been approved yet.')
+
+    checkedout_value = request_data.get('checkedout')
+    if checkedout_value == True or checkedout_value == 'True':
+        return render_template('verify_qr_error.html', message='QR code already used. Student has already checked out.')
+
+    if request_data.get('datetime') != current_date:
+        return render_template('verify_qr_error.html', message='QR code expired. Valid only for the date: ' + request_data.get('datetime', 'N/A'))
+
+    # Show generated/scanned timestamps and duration if present
+    generated_at = request_data.get('generated_at')
+    scanned_at = request_data.get('scanned_at')
+    duration_seconds = request_data.get('duration_seconds')
+
+    return render_template('verify_qr.html', key=request_data['key'], student_id=request_data['student_id'], name=request_data['name'], reason=request_data['reason'], datetime=request_data['datetime'], generated_at=generated_at, scanned_at=scanned_at, duration_seconds=duration_seconds)
     
 @app.route('/change', methods=['GET', 'POST'])
 def change():
@@ -324,22 +468,16 @@ def change():
         current_password = request.form['current_password']
         new_password = request.form['new_password']
 
-        if session["login_type"] == 'student':
-            user = mongo.db.studentdata.find_one({'username': username, 'password': current_password})
-        elif session["login_type"] == 'security':
-            user = mongo.db.securitydata.find_one({'username': username, 'password': current_password})
+        user = None
+        if session["login_type"] == 'security':
+            user = next(db.collection('securitydata').where('username', '==', username).where('password', '==', current_password).limit(1).stream(), None)
         elif session["login_type"] == 'faculty':
-            user = mongo.db.facultydata.find_one({'username': username, 'password': current_password})
+            user = next(db.collection('facultydata').where('username', '==', username).where('password', '==', current_password).limit(1).stream(), None)
         else:
             return "Invalid login type."
 
         if user:
-            if session["login_type"] == 'student':
-                mongo.db.studentdata.update_one({'_id': user['_id']}, {'$set': {'password': new_password}})
-            elif session["login_type"] == 'security':
-                mongo.db.securitydata.update_one({'_id': user['_id']}, {'$set': {'password': new_password}})
-            elif session["login_type"] == 'faculty':
-                mongo.db.facultydata.update_one({'_id': user['_id']}, {'$set': {'password': new_password}})
+            db.collection(f"{session['login_type']}data").document(user.id).update({'password': new_password})
             return redirect("/logout")
         else:
             return "Incorrect username or password. Please try again."
@@ -347,16 +485,40 @@ def change():
 
 @app.route('/checkout/<key>')
 def checkout(key):
-    current_time = datetime.now().strftime('%H:%M:%S')
-    request_data = mongo.db.requests.find_one({'key': key})
-    mongo.db.requests.update_one({'key': key}, {'$set': {'checkedout': 'True'}})
-    mongo.db.requests.update_one({'key': key}, {'$set': {'checkouttime': current_time}})
-    Name=request_data['name']
-    id=request_data['student_id']
+    current_time = datetime.now()
+    request_doc = next(db.collection('requests').where('key', '==', key).limit(1).stream(), None)
+
+    if not request_doc:
+        return "Invalid checkout key", 404
+
+    request_data = request_doc.to_dict()
+
+    # Compute duration if generated_at exists
+    generated_at_str = request_data.get('generated_at')
+    duration_seconds = None
+    if generated_at_str:
+        try:
+            gen_dt = datetime.fromisoformat(generated_at_str)
+            duration_seconds = (current_time - gen_dt).total_seconds()
+        except Exception:
+            duration_seconds = None
+
+    update_fields = {
+        'checkedout': True,
+        'checkouttime': current_time.strftime('%H:%M:%S'),
+        'scanned_at': current_time.isoformat()
+    }
+    if duration_seconds is not None:
+        update_fields['duration_seconds'] = duration_seconds
+
+    db.collection('requests').document(request_doc.id).update(update_fields)
+
+    Name = request_data.get('name')
+    id = request_data.get('student_id')
     subject = "Your Ward Checked Out"
     sender = "poppingaming1@gmail.com"
     recipients = ["pingalipraneeth1@gmail.com"]
-    body = f"Your Ward '{Name}' '{id}' has checked out University at {current_time}."
+    body = f"Your Ward '{Name}' '{id}' has checked out University at {current_time.strftime('%H:%M:%S')}."
     send_email(subject, sender, recipients, body)
     return redirect('/cam')
 
@@ -373,11 +535,11 @@ def stats():
     if request.method == 'POST':
         student_id = request.form['student_id']
 
-        # Plot 1: Requests received by date
-        requests_data = mongo.db.requests.find({'faculty': session.get('username')})
+        requests_docs = db.collection('requests').where('faculty', '==', session.get('username')).stream()
         date_counts = {}
-        for request_ in requests_data:
-            date = request_['datetime'][0:2] + '-' + request_['datetime'][3:5]  # Convert date to string format
+        for doc in requests_docs:
+            request_ = doc.to_dict()
+            date = request_['datetime'][0:2] + '-' + request_['datetime'][3:5]
             current_month = datetime.now().month
             if int(request_['datetime'][3:5]) == current_month:
                 date_counts[date] = date_counts.get(date, 0) + 1
@@ -400,11 +562,11 @@ def stats():
         plot_url1 = base64.b64encode(img.getvalue()).decode()
         plt.close()
 
-        # Plot 2: Requests made by specific student ID
-        requests_data = mongo.db.requests.find({'student_id': student_id})
+        requests_docs = db.collection('requests').where('student_id', '==', student_id).stream()
         date_counts = {}
-        for request_ in requests_data:
-            date = request_['datetime'][0:2] + '-' + request_['datetime'][3:5]  # Convert date to string format
+        for doc in requests_docs:
+            request_ = doc.to_dict()
+            date = request_['datetime'][0:2] + '-' + request_['datetime'][3:5]
             date_counts[date] = date_counts.get(date, 0) + 1
 
         dates = list(date_counts.keys())
@@ -429,32 +591,8 @@ def stats():
 
 @app.route('/stats2', methods=['GET', 'POST'])
 def stats2():
-    plot_url2 = None
-    requests_data = mongo.db.requests.find({'student_id': session["username"]})
-    date_counts = {}
-    for request_ in requests_data:
-            date = request_['datetime'][0:2] + '-' + request_['datetime'][3:5]  # Convert date to string format
-            date_counts[date] = date_counts.get(date, 0) + 1
-
-    dates = list(date_counts.keys())
-    counts = list(date_counts.values())
-
-    plt.bar(dates, counts, color='orange')
-    plt.xlabel('Date')
-    plt.title('Requests Received by Date: ')
-    plt.xticks(rotation=45)
-
-    for i in range(len(dates)):
-            plt.text(i, counts[i], str(counts[i]), ha='center', va='bottom')
-
-    plt.yticks([])
-    img = BytesIO()
-    plt.savefig(img, format='png')
-    img.seek(0)
-    plot_url2 = base64.b64encode(img.getvalue()).decode()
-    plt.close()
-
-    return render_template('stats2.html', plot_url2=plot_url2)
+    # Student-specific stats removed. Redirecting to faculty/hod stats.
+    return redirect(url_for('stats'))
 
 @app.route('/wrong')
 def wrong():
@@ -479,4 +617,5 @@ def handle_qr_scanned(data):
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True,allow_unsafe_werkzeug=True)
+    port = int(os.environ.get('PORT', 5000))
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)

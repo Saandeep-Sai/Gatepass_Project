@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security QR Code Scanner</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1000px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+        
+        header {
+            background: #1a2a6c;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            position: relative;
+        }
+        
+        h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header-icon {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 32px;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 20px;
+        }
+        
+        .panel {
+            flex: 1;
+            min-width: 300px;
+            padding: 20px;
+        }
+        
+        .divider {
+            width: 2px;
+            background: linear-gradient(to bottom, transparent, #1a2a6c, transparent);
+            margin: 0 20px;
+        }
+        
+        h2 {
+            color: #1a2a6c;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #fdbb2d;
+        }
+        
+        .qr-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        #qrcode {
+            display: inline-block;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .request-info {
+            background: #f5f7ff;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #ccc;
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        
+        .scanner-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .scanner {
+            width: 100%;
+            height: 250px;
+            background: #2c3e50;
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 18px;
+        }
+        
+        .scanner::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 4px;
+            background: #fdbb2d;
+            box-shadow: 0 0 20px 5px #fdbb2d;
+            animation: scan 2s linear infinite;
+        }
+        
+        @keyframes scan {
+            0% { top: 0; }
+            50% { top: 100%; }
+            100% { top: 0; }
+        }
+        
+        .scanner-content {
+            z-index: 1;
+            text-align: center;
+        }
+        
+        .scanner-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #fdbb2d;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 25px;
+            background: #1a2a6c;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn:hover {
+            background: #2a3b8c;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn-scan {
+            background: #1a2a6c;
+        }
+        
+        .btn-success {
+            background: #28a745;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: 600;
+            display: none;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            display: block;
+        }
+        
+        .status.denied {
+            background: #f8d7da;
+            color: #721c24;
+            display: block;
+        }
+        
+        .instructions {
+            background: #fff4e0;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 30px;
+            font-size: 14px;
+        }
+        
+        .instructions ol {
+            padding-left: 20px;
+            margin-top: 10px;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+        }
+        
+        @media (max-width: 768px) {
+            .divider {
+                width: 100%;
+                height: 2px;
+                margin: 20px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Security Access Control System</h1>
+            <div class="subtitle">QR Code Verification Portal</div>
+            <div class="header-icon">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+        </header>
+        
+        <div class="content">
+            <div class="panel">
+                <h2>Access Request</h2>
+                
+                <div class="request-info">
+                    <div class="info-item">
+                        <span>Request ID:</span>
+                        <span>#SEC-2023-0891</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Requester:</span>
+                        <span>Johnathan Smith</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Department:</span>
+                        <span>Research & Development</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Access Level:</span>
+                        <span>Level 3 - Secure Labs</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Valid Until:</span>
+                        <span>Today, 23:59</span>
+                    </div>
+                </div>
+                
+                <div class="qr-container">
+                    <div id="qrcode"></div>
+                    <p style="margin-top: 15px; font-weight: 500;">Scan this QR code with security device</p>
+                </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="panel">
+                <h2>Security Scanner</h2>
+                
+                <div class="scanner-container">
+                    <div class="scanner">
+                        <div class="scanner-content">
+                            <div class="scanner-icon">
+                                <i class="fas fa-camera"></i>
+                            </div>
+                            <p>Point camera at QR code</p>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-scan" id="scan-btn">
+                        <i class="fas fa-camera"></i> Simulate Scan
+                    </button>
+                </div>
+                
+                <div class="status" id="status-msg">
+                    <!-- Status message will appear here -->
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="btn btn-success" id="approve-btn">
+                        <i class="fas fa-check-circle"></i> Approve Access
+                    </button>
+                    <button class="btn btn-danger" id="deny-btn">
+                        <i class="fas fa-times-circle"></i> Deny Access
+                    </button>
+                </div>
+                
+                <div class="instructions">
+                    <h3>Security Protocol:</h3>
+                    <ol>
+                        <li>Scan the requester's QR code using the security scanner</li>
+                        <li>Verify the requester's identity and access privileges</li>
+                        <li>Check if the request is within valid time window</li>
+                        <li>Approve or deny the request based on security protocols</li>
+                        <li>Log all actions in the security database</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Generate QR code
+            const qrElement = document.getElementById('qrcode');
+            const requestData = JSON.stringify({
+                requestId: "SEC-2023-0891",
+                name: "Johnathan Smith",
+                department: "R&D",
+                accessLevel: 3,
+                validUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+            });
+            
+            QRCode.toCanvas(qrElement, requestData, {
+                width: 200,
+                margin: 1,
+                color: {
+                    dark: "#1a2a6c",
+                    light: "#ffffff"
+                }
+            }, function(error) {
+                if (error) console.error(error);
+            });
+            
+            // Get DOM elements
+            const scanBtn = document.getElementById('scan-btn');
+            const approveBtn = document.getElementById('approve-btn');
+            const denyBtn = document.getElementById('deny-btn');
+            const statusMsg = document.getElementById('status-msg');
+            
+            // Simulate scan button click
+            scanBtn.addEventListener('click', function() {
+                statusMsg.className = 'status';
+                statusMsg.textContent = 'QR code scanned. Please verify request details and take action.';
+                statusMsg.classList.add('success');
+                
+                // Enable action buttons
+                approveBtn.disabled = false;
+                denyBtn.disabled = false;
+            });
+            
+            // Approve button click
+            approveBtn.addEventListener('click', function() {
+                statusMsg.textContent = 'Access APPROVED. Logging entry and notifying requester.';
+                statusMsg.className = 'status success';
+                
+                // Disable buttons after action
+                approveBtn.disabled = true;
+                denyBtn.disabled = true;
+            });
+            
+            // Deny button click
+            denyBtn.addEventListener('click', function() {
+                statusMsg.textContent = 'Access DENIED. Security team has been notified.';
+                statusMsg.className = 'status denied';
+                
+                // Disable buttons after action
+                approveBtn.disabled = true;
+                denyBtn.disabled = true;
+            });
+            
+            // Initially disable action buttons
+            approveBtn.disabled = true;
+            denyBtn.disabled = true;
+        });
+    </script>
+</body>
+</html>
