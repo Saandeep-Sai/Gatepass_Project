@@ -248,21 +248,68 @@ def hod():
 
     current_date = datetime.now().date().strftime('%d-%m-%Y')
     
-    # Fetch faculty requests only
+    # Fetch ALL faculty requests (not filtered by date for history)
     all_requests = db.collection('requests').where('type', '==', 'faculty').stream()
-    all_requests_list = [{'_id': doc.id, **doc.to_dict()} for doc in all_requests]
+    all_requests_list = []
     
+    for doc in all_requests:
+        request_data = {'_id': doc.id, **doc.to_dict()}
+        
+        # Format check-in time (generated_at) and checkout time (scanned_at) for display
+        if request_data.get('generated_at'):
+            try:
+                gen_dt = datetime.fromisoformat(request_data['generated_at'])
+                request_data['check_in_time'] = gen_dt.strftime('%d-%m-%Y %H:%M:%S')
+            except:
+                request_data['check_in_time'] = 'N/A'
+        else:
+            request_data['check_in_time'] = 'N/A'
+        
+        if request_data.get('scanned_at'):
+            try:
+                scan_dt = datetime.fromisoformat(request_data['scanned_at'])
+                request_data['checkout_time_display'] = scan_dt.strftime('%d-%m-%Y %H:%M:%S')
+            except:
+                request_data['checkout_time_display'] = 'N/A'
+        else:
+            request_data['checkout_time_display'] = 'Not Scanned'
+        
+        # Format duration if available
+        if request_data.get('duration_seconds'):
+            duration_sec = int(request_data['duration_seconds'])
+            hours = duration_sec // 3600
+            minutes = (duration_sec % 3600) // 60
+            seconds = duration_sec % 60
+            request_data['duration_display'] = f"{hours}h {minutes}m {seconds}s"
+        else:
+            request_data['duration_display'] = 'N/A'
+        
+        all_requests_list.append(request_data)
+    
+    # Pending requests (all dates)
     faculty_pending = [r for r in all_requests_list if r.get('status') == 'Pending']
-    faculty_approved = [r for r in all_requests_list if r.get('status') == 'Approved' and r.get('datetime') == current_date]
-    faculty_denied = [r for r in all_requests_list if r.get('status') == 'Denied' and r.get('datetime') == current_date]
+    
+    # Approved requests (today only for quick view)
+    faculty_approved_today = [r for r in all_requests_list if r.get('status') == 'Approved' and r.get('datetime') == current_date]
+    
+    # All approved requests (history - all dates)
+    faculty_approved_all = [r for r in all_requests_list if r.get('status') == 'Approved']
+    
+    # Denied requests (today only)
+    faculty_denied_today = [r for r in all_requests_list if r.get('status') == 'Denied' and r.get('datetime') == current_date]
+    
+    # All denied requests (history - all dates)
+    faculty_denied_all = [r for r in all_requests_list if r.get('status') == 'Denied']
     
     total_faculty_docs = db.collection('faculty').stream()
     total_faculty = [doc.to_dict() for doc in total_faculty_docs]
 
     return render_template('hod.html', 
                          faculty_pending=faculty_pending,
-                         faculty_approved=faculty_approved,
-                         faculty_denied=faculty_denied,
+                         faculty_approved=faculty_approved_today,
+                         faculty_approved_all=faculty_approved_all,
+                         faculty_denied=faculty_denied_today,
+                         faculty_denied_all=faculty_denied_all,
                          total_faculty=total_faculty)
 
 @app.route('/faculty', methods=['GET', 'POST'])
@@ -307,7 +354,42 @@ def faculty():
 
     faculty_id = session['username']
     requests_docs = db.collection('requests').where('student_id', '==', faculty_id).stream()
-    requests = [{'id': doc.id, **doc.to_dict()} for doc in requests_docs]
+    
+    requests = []
+    for doc in requests_docs:
+        request_data = {'id': doc.id, **doc.to_dict()}
+        
+        # Format check-in time (generated_at) and checkout time (scanned_at) for display
+        if request_data.get('generated_at'):
+            try:
+                gen_dt = datetime.fromisoformat(request_data['generated_at'])
+                request_data['check_in_time'] = gen_dt.strftime('%d-%m-%Y %H:%M:%S')
+            except:
+                request_data['check_in_time'] = 'N/A'
+        else:
+            request_data['check_in_time'] = 'Not Approved Yet'
+        
+        if request_data.get('scanned_at'):
+            try:
+                scan_dt = datetime.fromisoformat(request_data['scanned_at'])
+                request_data['checkout_time_display'] = scan_dt.strftime('%d-%m-%Y %H:%M:%S')
+            except:
+                request_data['checkout_time_display'] = 'N/A'
+        else:
+            request_data['checkout_time_display'] = 'Not Scanned'
+        
+        # Format duration if available
+        if request_data.get('duration_seconds'):
+            duration_sec = int(request_data['duration_seconds'])
+            hours = duration_sec // 3600
+            minutes = (duration_sec % 3600) // 60
+            seconds = duration_sec % 60
+            request_data['duration_display'] = f"{hours}h {minutes}m {seconds}s"
+        else:
+            request_data['duration_display'] = 'N/A'
+        
+        requests.append(request_data)
+    
     current_date = datetime.now().date().strftime('%d-%m-%Y')
     approved_requests = [req for req in requests if req.get('status') == 'Approved' and req.get('datetime') == current_date]
 
