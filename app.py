@@ -169,7 +169,41 @@ def get_faculty_requests():
     current_date = datetime.now().date().strftime('%d-%m-%Y')
     
     all_requests = db.collection('requests').where('type', '==', 'faculty').stream()
-    all_requests_list = [{'_id': doc.id, **doc.to_dict()} for doc in all_requests]
+    all_requests_list = []
+    
+    for doc in all_requests:
+        request_data = {'_id': doc.id, **doc.to_dict()}
+        
+        # Format check-in time (generated_at) and checkout time (scanned_at) for display
+        if request_data.get('generated_at'):
+            try:
+                gen_dt = datetime.fromisoformat(request_data['generated_at'])
+                request_data['check_in_time'] = gen_dt.strftime('%d-%m-%Y %H:%M:%S')
+            except:
+                request_data['check_in_time'] = 'N/A'
+        else:
+            request_data['check_in_time'] = 'N/A'
+        
+        if request_data.get('scanned_at'):
+            try:
+                scan_dt = datetime.fromisoformat(request_data['scanned_at'])
+                request_data['checkout_time_display'] = scan_dt.strftime('%d-%m-%Y %H:%M:%S')
+            except:
+                request_data['checkout_time_display'] = 'N/A'
+        else:
+            request_data['checkout_time_display'] = 'Not Scanned'
+        
+        # Format duration if available
+        if request_data.get('duration_seconds'):
+            duration_sec = int(request_data['duration_seconds'])
+            hours = duration_sec // 3600
+            minutes = (duration_sec % 3600) // 60
+            seconds = duration_sec % 60
+            request_data['duration_display'] = f"{hours}h {minutes}m {seconds}s"
+        else:
+            request_data['duration_display'] = 'N/A'
+        
+        all_requests_list.append(request_data)
     
     faculty_pending = [r for r in all_requests_list if r.get('status') == 'Pending']
     faculty_approved = [r for r in all_requests_list if r.get('status') == 'Approved' and r.get('datetime') == current_date]
@@ -390,8 +424,8 @@ def faculty():
         
         requests.append(request_data)
     
-    current_date = datetime.now().date().strftime('%d-%m-%Y')
-    approved_requests = [req for req in requests if req.get('status') == 'Approved' and req.get('datetime') == current_date]
+    # Show all approved requests (not just today's) in Active QR Codes section
+    approved_requests = [req for req in requests if req.get('status') == 'Approved']
 
     return render_template('faculty_dashboard.html', requests=requests, approved_requests=approved_requests)
 

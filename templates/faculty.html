@@ -317,13 +317,28 @@
             });
             
             // Show selected section
-            document.getElementById(sectionId).style.display = 'block';
+            const selectedSection = document.getElementById(sectionId);
+            if (selectedSection) {
+                selectedSection.style.display = 'block';
+            }
             
             // Update active menu item
             document.querySelectorAll('.sidebar li').forEach(item => {
                 item.classList.remove('active');
             });
-            event.target.classList.add('active');
+            
+            // Find and activate the clicked menu item based on sectionId
+            const sectionMap = {
+                'pending': 0,
+                'approved': 1,
+                'denied': 2,
+                'students': 3
+            };
+            const menuItems = document.querySelectorAll('.sidebar li');
+            const index = sectionMap[sectionId];
+            if (index !== undefined && menuItems[index]) {
+                menuItems[index].classList.add('active');
+            }
         }
         
         // Auto-refresh data every 3 seconds without page reload

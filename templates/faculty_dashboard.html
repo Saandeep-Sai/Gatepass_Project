@@ -520,22 +520,22 @@
     <div class="container">
         <div class="sidebar">
             <ul>
-                <li class="active" onclick="showTab('dashboard')">
+                <li class="active" data-tab="dashboard" onclick="showTab('dashboard')">
                     <span class="sidebar-icon">📊</span> Dashboard
                 </li>
-                <li onclick="showTab('request')">
+                <li data-tab="request" onclick="showTab('request')">
                     <span class="sidebar-icon">📝</span> Request Gate Pass
                 </li>
-                <li onclick="showTab('requests')">
+                <li data-tab="requests" onclick="showTab('requests')">
                     <span class="sidebar-icon">📋</span> My Requests
                 </li>
-                <li onclick="showTab('statistics')">
+                <li data-tab="statistics" onclick="showTab('statistics')">
                     <span class="sidebar-icon">📈</span> Statistics
                 </li>
-                <li onclick="showTab('profile')">
+                <li data-tab="profile" onclick="showTab('profile')">
                     <span class="sidebar-icon">👤</span> Profile
                 </li>
-                <li onclick="showTab('help')">
+                <li data-tab="help" onclick="showTab('help')">
                     <span class="sidebar-icon">❓</span> Help & Support
                 </li>
             </ul>
@@ -586,10 +586,19 @@
                             <div>
                                 <strong>Date:</strong> {{ req.datetime }}<br>
                                 <strong>Purpose:</strong> {{ req.reason }}<br>
-                                <strong>Status:</strong> {% if req.checkedout %}<span class="status-used">Used</span>{% else %}<span class="status-approved">Valid</span>{% endif %}
+                                <strong>QR Generated At:</strong> {{ req.check_in_time }}<br>
+                                <strong>Status:</strong> {% if req.checkedout %}<span class="status-used">Used</span>{% else %}<span class="status-approved">Valid</span>{% endif %}<br>
+                                {% if req.checkedout %}
+                                <strong>Scanned At:</strong> {{ req.checkout_time_display }}<br>
+                                <strong>Duration:</strong> {{ req.duration_display }}
+                                {% endif %}
                             </div>
                             <div class="qr-info">
+                                {% if req.checkedout %}
+                                This QR code has been used
+                                {% else %}
                                 Show this QR code at the gate for exit
+                                {% endif %}
                             </div>
                         </div>
                         {% endfor %}
@@ -608,10 +617,11 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Date & Time</th>
+                                <th>Date</th>
                                 <th>Reason</th>
                                 <th>Status</th>
-                                <th>Priority</th>
+                                <th>QR Generated</th>
+                                <th>Duration</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -628,15 +638,8 @@
                                         <span class="status-pending">Pending</span>
                                     {% endif %}
                                 </td>
-                                <td>
-                                    {% if req.priority == 'high' %}
-                                        <span class="priority-high">High</span>
-                                    {% elif req.priority == 'medium' %}
-                                        <span class="priority-medium">Medium</span>
-                                    {% else %}
-                                        <span class="priority-low">Low</span>
-                                    {% endif %}
-                                </td>
+                                <td>{{ req.check_in_time }}</td>
+                                <td>{{ req.duration_display }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -684,10 +687,13 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Date & Time</th>
+                                <th>Date</th>
                                 <th>Reason</th>
                                 <th>Status</th>
                                 <th>Priority</th>
+                                <th>QR Generated At</th>
+                                <th>Checkout Time</th>
+                                <th>Duration</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -714,6 +720,9 @@
                                         <span class="priority-low">Low</span>
                                     {% endif %}
                                 </td>
+                                <td>{{ req.check_in_time }}</td>
+                                <td>{{ req.checkout_time_display }}</td>
+                                <td>{{ req.duration_display }}</td>
                                 <td>
                                     {% if req.status == 'Approved' and req.key %}
                                         <a href="/generate_qr/{{ req.key }}" target="_blank" class="action-btn">View QR</a>
@@ -960,25 +969,20 @@
             });
             
             // Show selected tab
-            document.getElementById(tabId).classList.add('active');
+            const selectedTab = document.getElementById(tabId);
+            if (selectedTab) {
+                selectedTab.classList.add('active');
+            }
             
             // Update active menu item
             document.querySelectorAll('.sidebar li').forEach(item => {
                 item.classList.remove('active');
             });
             
-            // Find and activate the clicked menu item
-            const menuItems = document.querySelectorAll('.sidebar li');
-            for (let item of menuItems) {
-                if (item.textContent.includes(tabId.charAt(0).toUpperCase() + tabId.slice(1))) {
-                    item.classList.add('active');
-                    break;
-                }
-            }
-            
-            // For dashboard tab specifically
-            if (tabId === 'dashboard') {
-                menuItems[0].classList.add('active');
+            // Activate the clicked menu item using data-tab attribute
+            const activeMenuItem = document.querySelector(`.sidebar li[data-tab="${tabId}"]`);
+            if (activeMenuItem) {
+                activeMenuItem.classList.add('active');
             }
             
             // Initialize charts if statistics tab is shown

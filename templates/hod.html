@@ -262,12 +262,28 @@
             <div class="card" id="approved" style="display:none;">
                 <h2>Approved Today</h2>
                 <table>
-                    <thead><tr><th>ID</th><th>Name</th><th>Reason</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Reason</th>
+                            <th>QR Generated At</th>
+                            <th>Checkout Time</th>
+                            <th>Duration</th>
+                        </tr>
+                    </thead>
                     <tbody>
                         {% for req in faculty_approved %}
-                        <tr><td>{{ req.student_id }}</td><td>{{ req.name }}</td><td>{{ req.reason }}</td></tr>
+                        <tr>
+                            <td>{{ req.student_id }}</td>
+                            <td>{{ req.name }}</td>
+                            <td>{{ req.reason }}</td>
+                            <td>{{ req.check_in_time }}</td>
+                            <td>{{ req.checkout_time_display }}</td>
+                            <td>{{ req.duration_display }}</td>
+                        </tr>
                         {% else %}
-                        <tr><td colspan="3" style="text-align:center;">No approved faculty requests</td></tr>
+                        <tr><td colspan="6" style="text-align:center;">No approved faculty requests</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -277,12 +293,24 @@
             <div class="card" id="denied" style="display:none;">
                 <h2>Denied Today</h2>
                 <table>
-                    <thead><tr><th>ID</th><th>Name</th><th>Reason</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Reason</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
                     <tbody>
                         {% for req in faculty_denied %}
-                        <tr><td>{{ req.student_id }}</td><td>{{ req.name }}</td><td>{{ req.reason }}</td></tr>
+                        <tr>
+                            <td>{{ req.student_id }}</td>
+                            <td>{{ req.name }}</td>
+                            <td>{{ req.reason }}</td>
+                            <td>{{ req.datetime }}</td>
+                        </tr>
                         {% else %}
-                        <tr><td colspan="3" style="text-align:center;">No denied faculty requests</td></tr>
+                        <tr><td colspan="4" style="text-align:center;">No denied faculty requests</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -324,8 +352,75 @@
             event.target.classList.add('active');
         }
         
-        // Auto-refresh data every 3 seconds without page reload
-        setInterval(() => {
+        // Function to update pending requests table
+        function updatePendingTable(requests) {
+            const tbody = document.querySelector('#faculty-pending tbody');
+            if (requests.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No pending faculty requests</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = requests.map(req => `
+                <tr>
+                    <td>${req.student_id || ''}</td>
+                    <td>${req.name || ''}</td>
+                    <td>${req.reason || ''}</td>
+                    <td><span class="priority-${req.priority || 'low'}">${req.priority || 'low'}</span></td>
+                    <td>${req.datetime || ''}</td>
+                    <td>
+                        <form method="POST" action="/hod" style="display:inline;">
+                            <input type="hidden" name="request_id" value="${req._id}">
+                            <button class="btn btn-approve" name="action" value="allow">Approve</button>
+                        </form>
+                        <form method="POST" action="/hod" style="display:inline;">
+                            <input type="hidden" name="request_id" value="${req._id}">
+                            <button class="btn btn-deny" name="action" value="deny">Deny</button>
+                        </form>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        // Function to update approved requests table
+        function updateApprovedTable(requests) {
+            const tbody = document.querySelector('#approved tbody');
+            if (requests.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No approved faculty requests</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = requests.map(req => `
+                <tr>
+                    <td>${req.student_id || ''}</td>
+                    <td>${req.name || ''}</td>
+                    <td>${req.reason || ''}</td>
+                    <td>${req.check_in_time || 'N/A'}</td>
+                    <td>${req.checkout_time_display || 'Not Scanned'}</td>
+                    <td>${req.duration_display || 'N/A'}</td>
+                </tr>
+            `).join('');
+        }
+        
+        // Function to update denied requests table
+        function updateDeniedTable(requests) {
+            const tbody = document.querySelector('#denied tbody');
+            if (requests.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No denied faculty requests</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = requests.map(req => `
+                <tr>
+                    <td>${req.student_id || ''}</td>
+                    <td>${req.name || ''}</td>
+                    <td>${req.reason || ''}</td>
+                    <td>${req.datetime || ''}</td>
+                </tr>
+            `).join('');
+        }
+        
+        // Auto-refresh data every 5 seconds without page reload
+        function refreshData() {
             fetch('/api/faculty/requests')
                 .then(response => response.json())
                 .then(data => {
@@ -333,9 +428,18 @@
                     document.querySelectorAll('.stat-card .number')[0].textContent = data.faculty_pending.length;
                     document.querySelectorAll('.stat-card .number')[1].textContent = data.faculty_approved.length;
                     document.querySelectorAll('.stat-card .number')[2].textContent = data.faculty_denied.length;
+                    
+                    // Update tables
+                    updatePendingTable(data.faculty_pending);
+                    updateApprovedTable(data.faculty_approved);
+                    updateDeniedTable(data.faculty_denied);
                 })
                 .catch(error => console.error('Error fetching updates:', error));
-        }, 3000);
+        }
+        
+        // Refresh immediately on page load and then every 5 seconds
+        refreshData();
+        setInterval(refreshData, 5000);
     </script>
 </body>
 </html>
