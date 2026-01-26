@@ -5,6 +5,7 @@ A comprehensive web-based gate pass management system for educational institutio
 ## 🚀 Features
 
 ### Faculty Dashboard
+
 - **Request Gate Pass**: Submit leave requests with detailed reasons
 - **Real-time Status Tracking**: View pending, approved, and denied requests
 - **QR Code Generation**: Automatic QR code creation upon HOD approval
@@ -13,6 +14,7 @@ A comprehensive web-based gate pass management system for educational institutio
 - **Statistics & Analytics**: Visual representation of request trends
 
 ### HOD Dashboard
+
 - **Request Management**: Approve or deny faculty leave requests
 - **Priority-based Sorting**: High-priority requests highlighted
 - **Real-time Updates**: Auto-refresh every 5 seconds for new requests
@@ -21,6 +23,7 @@ A comprehensive web-based gate pass management system for educational institutio
 - **Faculty Management**: View complete faculty list
 
 ### Security Dashboard
+
 - **QR Code Validation**: Scan and verify gate pass QR codes
 - **Multi-step Verification**: Validates approval status and usage
 - **Checkout Recording**: Automatic timestamp and duration calculation
@@ -47,12 +50,14 @@ A comprehensive web-based gate pass management system for educational institutio
 ## 🔧 Installation
 
 ### 1. Clone the Repository
+
 ```bash
 git clone <repository-url>
 cd QR-CODE-GATE-PASS-MANAGEMENT-SYSTEM
 ```
 
 ### 2. Create Virtual Environment
+
 ```powershell
 # Windows PowerShell
 python -m venv .venv
@@ -64,6 +69,7 @@ source .venv/bin/activate
 ```
 
 ### 3. Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -92,6 +98,7 @@ MAIL_PASSWORD=your_app_password
 ## 🚀 Running the Application
 
 ### Development Mode
+
 ```bash
 python app.py
 ```
@@ -99,6 +106,7 @@ python app.py
 The application will be available at `http://localhost:5000`
 
 ### Production Mode
+
 ```bash
 gunicorn app:app
 ```
@@ -124,13 +132,15 @@ QR-CODE-GATE-PASS-MANAGEMENT-SYSTEM/
 ## 🔐 User Roles & Access
 
 ### Faculty
+
 - **Login**: Use faculty credentials
-- **Capabilities**: 
+- **Capabilities**:
   - Submit gate pass requests
   - View QR codes for approved requests
   - Track request status and history
 
 ### HOD (Head of Department)
+
 - **Login**: Use HOD credentials
 - **Capabilities**:
   - View all pending faculty requests
@@ -139,6 +149,7 @@ QR-CODE-GATE-PASS-MANAGEMENT-SYSTEM/
   - Manage faculty list
 
 ### Security
+
 - **Login**: Use security credentials
 - **Capabilities**:
   - Validate QR codes
@@ -150,6 +161,7 @@ QR-CODE-GATE-PASS-MANAGEMENT-SYSTEM/
 ### Collections
 
 #### `requests`
+
 - `student_id`: Faculty employee ID
 - `name`: Faculty name
 - `reason`: Leave reason
@@ -164,12 +176,15 @@ QR-CODE-GATE-PASS-MANAGEMENT-SYSTEM/
 - `qr_base64`: Base64 encoded QR code image
 
 #### `facultydata`
+
 User authentication data for faculty members
 
 #### `hoddata`
+
 User authentication data for HODs
 
 #### `securitydata`
+
 User authentication data for security personnel
 
 ## ⏱️ Time Tracking Features
@@ -188,6 +203,7 @@ User authentication data for security personnel
 ## 📧 Email Notifications
 
 Automatic email notifications sent when:
+
 - Request is approved
 - Request is denied
 - QR code is generated
@@ -211,16 +227,19 @@ Automatic email notifications sent when:
 ## 🐛 Troubleshooting
 
 ### Firebase Connection Issues
+
 - Verify `firebase_config.json` is in the project root
 - Check Firebase project permissions
 - Ensure Firestore is enabled in Firebase Console
 
 ### Email Not Sending
+
 - Verify Gmail App Password is correct
 - Check if "Less secure app access" is enabled (if applicable)
 - Verify SMTP settings in `app.py`
 
 ### QR Code Not Displaying
+
 - Check if `qrcode[pil]` is installed correctly
 - Verify the request has been approved
 - Clear browser cache
@@ -234,12 +253,14 @@ You need to add users to the respective collections (`facultydata`, `hoddata`, `
 ## 🚀 Deployment
 
 The application is ready for deployment on platforms like:
+
 - Render.com
 - Heroku
 - Google Cloud Platform
 - AWS
 
 Ensure to:
+
 1. Set environment variables on the platform
 2. Upload `firebase_config.json` securely
 3. Use gunicorn as the production server
