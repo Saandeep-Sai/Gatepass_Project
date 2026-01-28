@@ -48,6 +48,15 @@ def add_cache_control(response):
     response.headers["Expires"] = "0"
     return response
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for monitoring and deployment platforms"""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'service': 'CMR Gate Pass Management System'
+    }), 200
+
 def prioritize_text(text):
     text_lower = text.lower()
     
