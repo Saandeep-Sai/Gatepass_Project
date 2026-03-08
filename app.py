@@ -13,6 +13,12 @@ from werkzeug.utils import secure_filename
 import os
 from flask_mail import Mail, Message
 import time
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 
 app = Flask(__name__)
@@ -354,6 +360,159 @@ def hod():
                          faculty_denied=faculty_denied_today,
                          faculty_denied_all=faculty_denied_all,
                          total_faculty=total_faculty)
+
+@app.route('/hod/download-monthly-report', methods=['POST'])
+def download_monthly_report():
+    if 'login_type' not in session or session['login_type'] != 'hod':
+        return redirect(url_for('login'))
+    
+    month = request.form.get('month')
+    year = request.form.get('year')
+    
+    # Get month name
+    month_names = {
+        '01': 'January', '02': 'February', '03': 'March', '04': 'April',
+        '05': 'May', '06': 'June', '07': 'July', '08': 'August',
+        '09': 'September', '10': 'October', '11': 'November', '12': 'December'
+    }
+    month_name = month_names.get(month, 'Unknown')
+    
+    # Fetch all approved faculty requests
+    all_requests = db.collection('requests').where('type', '==', 'faculty').where('status', '==', 'Approved').stream()
+    approved_requests = []
+    
+    for doc in all_requests:
+        req_data = doc.to_dict()
+        if req_data.get('generated_at'):
+            try:
+                gen_dt = datetime.fromisoformat(req_data['generated_at'])
+                req_month = str(gen_dt.month).zfill(2)
+                req_year = str(gen_dt.year)
+                
+                if req_month == month and req_year == year:
+                    # Format times for display
+                    req_data['check_in_time'] = gen_dt.strftime('%d-%m-%Y %H:%M:%S')
+                    
+                    if req_data.get('scanned_at'):
+                        scan_dt = datetime.fromisoformat(req_data['scanned_at'])
+                        req_data['checkout_time_display'] = scan_dt.strftime('%d-%m-%Y %H:%M:%S')
+                        
+                        # Calculate duration
+                        if req_data.get('duration_seconds'):
+                            duration_sec = int(req_data['duration_seconds'])
+                            hours = duration_sec // 3600
+                            minutes = (duration_sec % 3600) // 60
+                            seconds = duration_sec % 60
+                            req_data['duration_display'] = f"{hours}h {minutes}m {seconds}s"
+                        else:
+                            req_data['duration_display'] = 'N/A'
+                    else:
+                        req_data['checkout_time_display'] = 'Not Scanned'
+                        req_data['duration_display'] = 'N/A'
+                    
+                    approved_requests.append(req_data)
+            except:
+                continue
+    
+    # Generate PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
+    
+    # Container for PDF elements
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Title
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=colors.HexColor('#2575fc'),
+        spaceAfter=12,
+        alignment=TA_CENTER
+    )
+    title = Paragraph(f"<b>CMR Gate Pass Management System</b>", title_style)
+    elements.append(title)
+    
+    # Subtitle
+    subtitle_style = ParagraphStyle(
+        'CustomSubtitle',
+        parent=styles['Normal'],
+        fontSize=14,
+        textColor=colors.HexColor('#666666'),
+        spaceAfter=20,
+        alignment=TA_CENTER
+    )
+    subtitle = Paragraph(f"<b>Monthly Approved Requests Report - {month_name} {year}</b>", subtitle_style)
+    elements.append(subtitle)
+    
+    # Summary
+    summary_text = f"<b>Total Approved Requests:</b> {len(approved_requests)}"
+    summary = Paragraph(summary_text, styles['Normal'])
+    elements.append(summary)
+    elements.append(Spacer(1, 20))
+    
+    if approved_requests:
+        # Table data
+        data = [['Employee ID', 'Name', 'Reason', 'Priority', 'Request Date', 'QR Generated', 'Scanned At', 'Duration']]
+        
+        for req in approved_requests:
+            data.append([
+                req.get('student_id', 'N/A'),
+                req.get('name', 'N/A'),
+                req.get('reason', 'N/A')[:30] + '...' if len(req.get('reason', '')) > 30 else req.get('reason', 'N/A'),
+                req.get('priority', 'N/A').upper(),
+                req.get('datetime', 'N/A'),
+                req.get('check_in_time', 'N/A'),
+                req.get('checkout_time_display', 'Not Scanned'),
+                req.get('duration_display', 'N/A')
+            ])
+        
+        # Create table
+        table = Table(data, colWidths=[0.8*inch, 1*inch, 1.5*inch, 0.7*inch, 0.9*inch, 1.2*inch, 1.2*inch, 0.8*inch])
+        
+        # Table style
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2575fc')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        
+        elements.append(table)
+    else:
+        no_data = Paragraph("<i>No approved requests found for this month.</i>", styles['Normal'])
+        elements.append(no_data)
+    
+    # Add footer
+    elements.append(Spacer(1, 30))
+    footer_style = ParagraphStyle(
+        'Footer',
+        parent=styles['Normal'],
+        fontSize=8,
+        textColor=colors.grey,
+        alignment=TA_CENTER
+    )
+    footer = Paragraph(f"Generated on {datetime.now().strftime('%d-%m-%Y %H:%M:%S')}", footer_style)
+    elements.append(footer)
+    
+    # Build PDF
+    doc.build(elements)
+    
+    # Prepare response
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f'Monthly_Report_{month_name}_{year}.pdf',
+        mimetype='application/pdf'
+    )
 
 @app.route('/faculty', methods=['GET', 'POST'])
 def faculty():
