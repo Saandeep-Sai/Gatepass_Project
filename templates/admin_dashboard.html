@@ -1,0 +1,1060 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard - CMR Gate Pass</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      body {
+        background-color: #f0f2f5;
+        color: #333;
+      }
+
+      /* ── Header ────────────────────────────────────── */
+      .header {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        color: white;
+        padding: 14px 28px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .header-left .admin-badge {
+        background: linear-gradient(135deg, #e94560, #c23152);
+        padding: 4px 14px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+      }
+
+      .header h1 {
+        font-size: 20px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+      }
+
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+
+      .header-right .user-label {
+        font-size: 13px;
+        opacity: 0.85;
+      }
+
+      .header-right a {
+        color: white;
+        text-decoration: none;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 6px 18px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        transition: background 0.2s;
+      }
+
+      .header-right a:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      /* ── Layout ─────────────────────────────────────── */
+      .layout {
+        display: flex;
+        min-height: calc(100vh - 56px);
+      }
+
+      /* ── Sidebar ────────────────────────────────────── */
+      .sidebar {
+        width: 260px;
+        background: #1a1a2e;
+        padding: 24px 0;
+        flex-shrink: 0;
+      }
+
+      .sidebar-title {
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        padding: 0 24px;
+        margin-bottom: 12px;
+      }
+
+      .sidebar ul {
+        list-style: none;
+      }
+
+      .sidebar li {
+        padding: 13px 24px;
+        color: rgba(255, 255, 255, 0.65);
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-left: 3px solid transparent;
+      }
+
+      .sidebar li:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: white;
+      }
+
+      .sidebar li.active {
+        background: rgba(233, 69, 96, 0.1);
+        color: #e94560;
+        border-left-color: #e94560;
+        font-weight: 600;
+      }
+
+      .sidebar li .icon {
+        font-size: 16px;
+        width: 22px;
+        text-align: center;
+      }
+
+      /* ── Main ───────────────────────────────────────── */
+      .main {
+        flex: 1;
+        padding: 28px;
+        overflow-y: auto;
+      }
+
+      /* ── Section Cards ──────────────────────────────── */
+      .section {
+        display: none;
+      }
+
+      .section.active {
+        display: block;
+      }
+
+      .section-header {
+        margin-bottom: 24px;
+      }
+
+      .section-header h2 {
+        font-size: 22px;
+        font-weight: 700;
+        color: #1a1a2e;
+        margin-bottom: 4px;
+      }
+
+      .section-header p {
+        color: #888;
+        font-size: 13px;
+      }
+
+      /* ── Stats Grid ─────────────────────────────────── */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 18px;
+        margin-bottom: 28px;
+      }
+
+      .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 22px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+
+      .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+      }
+
+      .stat-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+      }
+
+      .stat-card.blue::before { background: #2575fc; }
+      .stat-card.green::before { background: #43a047; }
+      .stat-card.orange::before { background: #ff9800; }
+      .stat-card.red::before { background: #e94560; }
+      .stat-card.purple::before { background: #6a11cb; }
+      .stat-card.teal::before { background: #00897b; }
+
+      .stat-card .stat-label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #999;
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+
+      .stat-card .stat-value {
+        font-size: 32px;
+        font-weight: 800;
+        color: #1a1a2e;
+      }
+
+      .stat-card .stat-sub {
+        font-size: 12px;
+        color: #aaa;
+        margin-top: 4px;
+      }
+
+      /* ── Card ───────────────────────────────────────── */
+      .card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        padding: 24px;
+        margin-bottom: 22px;
+      }
+
+      .card-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1a1a2e;
+        margin-bottom: 18px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* ── Tables ─────────────────────────────────────── */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th {
+        background: #f7f8fc;
+        color: #555;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        padding: 12px 14px;
+        text-align: left;
+        border-bottom: 2px solid #eee;
+        font-weight: 700;
+      }
+
+      td {
+        padding: 12px 14px;
+        font-size: 13px;
+        border-bottom: 1px solid #f0f0f0;
+        color: #444;
+      }
+
+      tr:hover td {
+        background: #fafbff;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #bbb;
+        font-size: 14px;
+      }
+
+      /* ── Badges ─────────────────────────────────────── */
+      .badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .badge-admin { background: #fce4ec; color: #c62828; }
+      .badge-hod { background: #e8eaf6; color: #283593; }
+      .badge-faculty { background: #e0f7fa; color: #00695c; }
+      .badge-security { background: #fff3e0; color: #e65100; }
+
+      .badge-pending { background: #fff8e1; color: #f57f17; }
+      .badge-approved { background: #e8f5e9; color: #2e7d32; }
+      .badge-denied { background: #ffebee; color: #c62828; }
+
+      .priority-high { background: #ffebee; color: #e53935; font-weight: 700; padding: 4px 10px; border-radius: 12px; font-size: 11px; }
+      .priority-medium { background: #fff8e1; color: #ffa000; font-weight: 700; padding: 4px 10px; border-radius: 12px; font-size: 11px; }
+      .priority-low { background: #e8f5e9; color: #43a047; font-weight: 700; padding: 4px 10px; border-radius: 12px; font-size: 11px; }
+
+      /* ── Buttons ─────────────────────────────────────── */
+      .btn {
+        padding: 7px 16px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #2575fc, #6a11cb);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        box-shadow: 0 4px 14px rgba(37, 117, 252, 0.4);
+        transform: translateY(-1px);
+      }
+
+      .btn-danger {
+        background: #ffebee;
+        color: #c62828;
+      }
+
+      .btn-danger:hover {
+        background: #ffcdd2;
+      }
+
+      .btn-success {
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+
+      .btn-success:hover {
+        background: #c8e6c9;
+      }
+
+      .btn-warn {
+        background: #fff3e0;
+        color: #e65100;
+      }
+
+      .btn-warn:hover {
+        background: #ffe0b2;
+      }
+
+      /* ── Forms ──────────────────────────────────────── */
+      .form-row {
+        display: flex;
+        gap: 14px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .form-group label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: #888;
+      }
+
+      .form-group input,
+      .form-group select {
+        padding: 9px 14px;
+        border: 1.5px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #333;
+        background: #fafafa;
+        transition: border-color 0.2s, background 0.2s;
+        min-width: 160px;
+      }
+
+      .form-group input:focus,
+      .form-group select:focus {
+        outline: none;
+        border-color: #2575fc;
+        background: white;
+      }
+
+      /* ── Filter bar ────────────────────────────────── */
+      .filter-bar {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+      }
+
+      .filter-bar input,
+      .filter-bar select {
+        padding: 8px 14px;
+        border: 1.5px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 13px;
+        background: white;
+      }
+
+      .filter-bar input:focus,
+      .filter-bar select:focus {
+        outline: none;
+        border-color: #2575fc;
+      }
+
+      /* ── Alerts / Toasts ───────────────────────────── */
+      .toast {
+        position: fixed;
+        top: 80px;
+        right: 28px;
+        padding: 14px 24px;
+        border-radius: 10px;
+        color: white;
+        font-size: 13px;
+        font-weight: 600;
+        z-index: 999;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+        animation: slideIn 0.3s ease-out, slideOut 0.3s ease-in 2.5s forwards;
+        display: none;
+      }
+
+      .toast.success { background: linear-gradient(135deg, #43a047, #2e7d32); }
+      .toast.error { background: linear-gradient(135deg, #e53935, #c62828); }
+      .toast.info { background: linear-gradient(135deg, #2575fc, #1565c0); }
+
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to   { transform: translateX(0); opacity: 1; }
+      }
+
+      @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to   { transform: translateX(100%); opacity: 0; }
+      }
+
+      /* ── Modal ──────────────────────────────────────── */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 200;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        backdrop-filter: blur(4px);
+      }
+
+      .modal-overlay.open {
+        display: flex;
+      }
+
+      .modal {
+        background: white;
+        border-radius: 14px;
+        padding: 32px;
+        width: 420px;
+        max-width: 95vw;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+        animation: modalPop 0.25s ease-out;
+      }
+
+      @keyframes modalPop {
+        from { transform: scale(0.9); opacity: 0; }
+        to   { transform: scale(1); opacity: 1; }
+      }
+
+      .modal h3 {
+        font-size: 18px;
+        margin-bottom: 20px;
+        color: #1a1a2e;
+      }
+
+      .modal .form-group {
+        margin-bottom: 14px;
+      }
+
+      .modal .modal-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 22px;
+      }
+
+      .modal .btn-cancel {
+        padding: 8px 20px;
+        border: 1.5px solid #ddd;
+        border-radius: 8px;
+        background: white;
+        color: #666;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      /* ── Responsive ─────────────────────────────────── */
+      @media (max-width: 768px) {
+        .sidebar { display: none; }
+        .main { padding: 16px; }
+        .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        .header h1 { font-size: 16px; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Toast notification -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>CMR Gate Pass</h1>
+        <span class="admin-badge">Admin Panel</span>
+      </div>
+      <div class="header-right">
+        <span class="user-label">{{ session.get('username', 'Admin') }}</span>
+        <a href="/logout">Logout</a>
+      </div>
+    </div>
+
+    <!-- Layout -->
+    <div class="layout">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-title">Navigation</div>
+        <ul>
+          <li class="active" onclick="switchSection('overview', this)">
+            <span class="icon">📊</span> Dashboard
+          </li>
+          <li onclick="switchSection('users', this)">
+            <span class="icon">👥</span> User Management
+          </li>
+          <li onclick="switchSection('requests', this)">
+            <span class="icon">📋</span> All Requests
+          </li>
+          <li onclick="switchSection('activity', this)">
+            <span class="icon">📈</span> Activity Logs
+          </li>
+        </ul>
+      </div>
+
+      <!-- Main Content -->
+      <div class="main">
+
+        <!-- ═══════ OVERVIEW SECTION ═══════ -->
+        <div class="section active" id="section-overview">
+          <div class="section-header">
+            <h2>Dashboard Overview</h2>
+            <p>System-wide monitoring at a glance</p>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card blue">
+              <div class="stat-label">Total Faculty</div>
+              <div class="stat-value" id="stat-faculty">{{ stats.total_faculty }}</div>
+              <div class="stat-sub">Registered accounts</div>
+            </div>
+            <div class="stat-card purple">
+              <div class="stat-label">Total HODs</div>
+              <div class="stat-value" id="stat-hod">{{ stats.total_hod }}</div>
+              <div class="stat-sub">Registered accounts</div>
+            </div>
+            <div class="stat-card orange">
+              <div class="stat-label">Total Security</div>
+              <div class="stat-value" id="stat-security">{{ stats.total_security }}</div>
+              <div class="stat-sub">Registered accounts</div>
+            </div>
+            <div class="stat-card red">
+              <div class="stat-label">Total Admins</div>
+              <div class="stat-value" id="stat-admin">{{ stats.total_admin }}</div>
+              <div class="stat-sub">Registered accounts</div>
+            </div>
+            <div class="stat-card green">
+              <div class="stat-label">Approved Today</div>
+              <div class="stat-value" id="stat-approved">{{ stats.approved_today }}</div>
+              <div class="stat-sub">Gate passes</div>
+            </div>
+            <div class="stat-card teal">
+              <div class="stat-label">Pending Requests</div>
+              <div class="stat-value" id="stat-pending">{{ stats.pending_requests }}</div>
+              <div class="stat-sub">Awaiting approval</div>
+            </div>
+          </div>
+
+          <!-- Recent Activity Preview -->
+          <div class="card">
+            <div class="card-title">📋 Recent Requests</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee ID</th>
+                  <th>Name</th>
+                  <th>Reason</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for req in recent_requests[:8] %}
+                <tr>
+                  <td>{{ req.student_id }}</td>
+                  <td>{{ req.name }}</td>
+                  <td>{{ req.reason[:40] }}{% if req.reason|length > 40 %}...{% endif %}</td>
+                  <td><span class="badge badge-{{ req.status|lower }}">{{ req.status }}</span></td>
+                  <td>{{ req.datetime }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="empty-state">No recent requests</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ═══════ USER MANAGEMENT SECTION ═══════ -->
+        <div class="section" id="section-users">
+          <div class="section-header">
+            <h2>User Management</h2>
+            <p>Add, edit roles, reset passwords, or remove user accounts</p>
+          </div>
+
+          <!-- Add User Form -->
+          <div class="card">
+            <div class="card-title">➕ Add New User</div>
+            <form id="add-user-form" onsubmit="addUser(event)">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Username</label>
+                  <input type="text" id="new-username" required placeholder="e.g. faculty2" />
+                </div>
+                <div class="form-group">
+                  <label>Password</label>
+                  <input type="text" id="new-password" required placeholder="e.g. pass123" />
+                </div>
+                <div class="form-group">
+                  <label>Role</label>
+                  <select id="new-role" required>
+                    <option value="faculty">Faculty</option>
+                    <option value="hod">HOD</option>
+                    <option value="security">Security</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Add User</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Users Table -->
+          <div class="card">
+            <div class="card-title">👥 All Users</div>
+            <div class="filter-bar">
+              <input type="text" id="user-search" placeholder="Search by username..." oninput="filterUsers()" />
+              <select id="user-role-filter" onchange="filterUsers()">
+                <option value="all">All Roles</option>
+                <option value="admin">Admin</option>
+                <option value="hod">HOD</option>
+                <option value="faculty">Faculty</option>
+                <option value="security">Security</option>
+              </select>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Username</th>
+                  <th>Current Role</th>
+                  <th>Change Role</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody">
+                <tr><td colspan="5" class="empty-state">Loading users...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ═══════ ALL REQUESTS SECTION ═══════ -->
+        <div class="section" id="section-requests">
+          <div class="section-header">
+            <h2>All Requests</h2>
+            <p>Monitor every gate pass request in the system</p>
+          </div>
+
+          <div class="card">
+            <div class="filter-bar">
+              <input type="text" id="req-search" placeholder="Search by name or ID..." oninput="filterRequests()" />
+              <select id="req-status-filter" onchange="filterRequests()">
+                <option value="all">All Status</option>
+                <option value="Pending">Pending</option>
+                <option value="Approved">Approved</option>
+                <option value="Denied">Denied</option>
+              </select>
+              <input type="date" id="req-date-filter" onchange="filterRequests()" />
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee ID</th>
+                  <th>Name</th>
+                  <th>Reason</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th>QR Generated</th>
+                  <th>Scanned At</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody id="requests-tbody">
+                <tr><td colspan="9" class="empty-state">Loading requests...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ═══════ ACTIVITY LOGS SECTION ═══════ -->
+        <div class="section" id="section-activity">
+          <div class="section-header">
+            <h2>Activity Logs</h2>
+            <p>Today's check-in and check-out activity</p>
+          </div>
+
+          <div class="card">
+            <div class="card-title">🕐 Today's Check-outs</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee ID</th>
+                  <th>Name</th>
+                  <th>Reason</th>
+                  <th>QR Generated</th>
+                  <th>Checkout Time</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for log in activity_logs %}
+                <tr>
+                  <td>{{ log.student_id }}</td>
+                  <td>{{ log.name }}</td>
+                  <td>{{ log.reason[:40] }}{% if log.reason|length > 40 %}...{% endif %}</td>
+                  <td>{{ log.check_in_time }}</td>
+                  <td>{{ log.checkout_time_display }}</td>
+                  <td>{{ log.duration_display }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="empty-state">No checkouts yet today</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div class="modal-overlay" id="reset-modal">
+      <div class="modal">
+        <h3>Reset Password</h3>
+        <input type="hidden" id="reset-username" />
+        <input type="hidden" id="reset-role" />
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="reset-user-display" disabled />
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="text" id="reset-new-password" placeholder="Enter new password" required />
+        </div>
+        <div class="modal-actions">
+          <button class="btn-cancel" onclick="closeResetModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="confirmResetPassword()">Reset Password</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ── All users & requests data (loaded via API) ──
+      let allUsers = [];
+      let allRequests = [];
+
+      // ── Section switching ──
+      function switchSection(sectionId, el) {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.getElementById('section-' + sectionId).classList.add('active');
+        document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
+        el.classList.add('active');
+
+        if (sectionId === 'users') loadUsers();
+        if (sectionId === 'requests') loadRequests();
+      }
+
+      // ── Toast ──
+      function showToast(msg, type = 'success') {
+        const toast = document.getElementById('toast');
+        toast.textContent = msg;
+        toast.className = 'toast ' + type;
+        toast.style.display = 'block';
+        toast.style.animation = 'none';
+        void toast.offsetHeight;
+        toast.style.animation = 'slideIn 0.3s ease-out, slideOut 0.3s ease-in 2.5s forwards';
+        setTimeout(() => { toast.style.display = 'none'; }, 3000);
+      }
+
+      // ── Load Users ──
+      function loadUsers() {
+        fetch('/admin/users')
+          .then(r => r.json())
+          .then(data => {
+            allUsers = data.users || [];
+            renderUsers(allUsers);
+          })
+          .catch(() => showToast('Error loading users', 'error'));
+      }
+
+      function renderUsers(users) {
+        const tbody = document.getElementById('users-tbody');
+        if (users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No users found</td></tr>';
+          return;
+        }
+        tbody.innerHTML = users.map((u, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td style="font-weight:600;">${u.username}</td>
+            <td><span class="badge badge-${u.role}">${u.role.toUpperCase()}</span></td>
+            <td>
+              <select id="role-select-${i}" style="padding:6px 10px; border:1.5px solid #e0e0e0; border-radius:6px; font-size:12px;">
+                <option value="faculty" ${u.role === 'faculty' ? 'selected' : ''}>Faculty</option>
+                <option value="hod" ${u.role === 'hod' ? 'selected' : ''}>HOD</option>
+                <option value="security" ${u.role === 'security' ? 'selected' : ''}>Security</option>
+                <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+              </select>
+              <button class="btn btn-success" onclick="changeRole('${u.username}', '${u.role}', ${i})" style="margin-left:6px;">Apply</button>
+            </td>
+            <td>
+              <button class="btn btn-warn" onclick="openResetModal('${u.username}', '${u.role}')">Reset Pwd</button>
+              <button class="btn btn-danger" onclick="deleteUser('${u.username}', '${u.role}')">Delete</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      function filterUsers() {
+        const search = document.getElementById('user-search').value.toLowerCase();
+        const role = document.getElementById('user-role-filter').value;
+        let filtered = allUsers;
+        if (search) filtered = filtered.filter(u => u.username.toLowerCase().includes(search));
+        if (role !== 'all') filtered = filtered.filter(u => u.role === role);
+        renderUsers(filtered);
+      }
+
+      // ── Add User ──
+      function addUser(e) {
+        e.preventDefault();
+        const username = document.getElementById('new-username').value.trim();
+        const password = document.getElementById('new-password').value.trim();
+        const role = document.getElementById('new-role').value;
+
+        fetch('/admin/add-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, role })
+        })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              showToast('User added successfully!');
+              document.getElementById('add-user-form').reset();
+              loadUsers();
+            } else {
+              showToast(data.message || 'Error adding user', 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'));
+      }
+
+      // ── Change Role ──
+      function changeRole(username, currentRole, index) {
+        const newRole = document.getElementById('role-select-' + index).value;
+        if (newRole === currentRole) {
+          showToast('Role is already ' + newRole, 'info');
+          return;
+        }
+
+        if (!confirm(`Change ${username}'s role from ${currentRole.toUpperCase()} to ${newRole.toUpperCase()}?`)) return;
+
+        fetch('/admin/update-role', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, current_role: currentRole, new_role: newRole })
+        })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              showToast(`${username} is now ${newRole.toUpperCase()}`);
+              loadUsers();
+            } else {
+              showToast(data.message || 'Error updating role', 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'));
+      }
+
+      // ── Delete User ──
+      function deleteUser(username, role) {
+        if (!confirm(`Delete user "${username}" (${role})? This cannot be undone.`)) return;
+
+        fetch('/admin/delete-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, role })
+        })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              showToast('User deleted');
+              loadUsers();
+            } else {
+              showToast(data.message || 'Error deleting user', 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'));
+      }
+
+      // ── Reset Password ──
+      function openResetModal(username, role) {
+        document.getElementById('reset-username').value = username;
+        document.getElementById('reset-role').value = role;
+        document.getElementById('reset-user-display').value = username;
+        document.getElementById('reset-new-password').value = '';
+        document.getElementById('reset-modal').classList.add('open');
+      }
+
+      function closeResetModal() {
+        document.getElementById('reset-modal').classList.remove('open');
+      }
+
+      function confirmResetPassword() {
+        const username = document.getElementById('reset-username').value;
+        const role = document.getElementById('reset-role').value;
+        const newPassword = document.getElementById('reset-new-password').value.trim();
+
+        if (!newPassword) {
+          showToast('Please enter a new password', 'error');
+          return;
+        }
+
+        fetch('/admin/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, role, new_password: newPassword })
+        })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              showToast('Password reset successfully');
+              closeResetModal();
+            } else {
+              showToast(data.message || 'Error resetting password', 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'));
+      }
+
+      // ── Load All Requests ──
+      function loadRequests() {
+        fetch('/admin/all-requests')
+          .then(r => r.json())
+          .then(data => {
+            allRequests = data.requests || [];
+            renderRequests(allRequests);
+          })
+          .catch(() => showToast('Error loading requests', 'error'));
+      }
+
+      function renderRequests(requests) {
+        const tbody = document.getElementById('requests-tbody');
+        if (requests.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No requests found</td></tr>';
+          return;
+        }
+        tbody.innerHTML = requests.map(req => `
+          <tr>
+            <td>${req.student_id || ''}</td>
+            <td style="font-weight:600;">${req.name || ''}</td>
+            <td>${(req.reason || '').substring(0, 40)}${(req.reason || '').length > 40 ? '...' : ''}</td>
+            <td><span class="priority-${req.priority || 'low'}">${(req.priority || 'low').toUpperCase()}</span></td>
+            <td><span class="badge badge-${(req.status || '').toLowerCase()}">${req.status || ''}</span></td>
+            <td>${req.datetime || ''}</td>
+            <td>${req.check_in_time || 'N/A'}</td>
+            <td>${req.checkout_time_display || 'Not Scanned'}</td>
+            <td>${req.duration_display || 'N/A'}</td>
+          </tr>
+        `).join('');
+      }
+
+      function filterRequests() {
+        const search = document.getElementById('req-search').value.toLowerCase();
+        const status = document.getElementById('req-status-filter').value;
+        const dateVal = document.getElementById('req-date-filter').value;
+
+        let filtered = allRequests;
+        if (search) {
+          filtered = filtered.filter(r => (r.name || '').toLowerCase().includes(search) || (r.student_id || '').toLowerCase().includes(search));
+        }
+        if (status !== 'all') {
+          filtered = filtered.filter(r => r.status === status);
+        }
+        if (dateVal) {
+          // Convert YYYY-MM-DD to DD-MM-YYYY for matching
+          const parts = dateVal.split('-');
+          const formatted = `${parts[2]}-${parts[1]}-${parts[0]}`;
+          filtered = filtered.filter(r => r.datetime === formatted);
+        }
+        renderRequests(filtered);
+      }
+
+      // ── Auto-refresh stats every 15s ──
+      function refreshStats() {
+        fetch('/admin/stats')
+          .then(r => r.json())
+          .then(data => {
+            document.getElementById('stat-faculty').textContent = data.total_faculty;
+            document.getElementById('stat-hod').textContent = data.total_hod;
+            document.getElementById('stat-security').textContent = data.total_security;
+            document.getElementById('stat-admin').textContent = data.total_admin;
+            document.getElementById('stat-approved').textContent = data.approved_today;
+            document.getElementById('stat-pending').textContent = data.pending_requests;
+          })
+          .catch(() => {});
+      }
+
+      setInterval(refreshStats, 15000);
+    </script>
+  </body>
+</html>

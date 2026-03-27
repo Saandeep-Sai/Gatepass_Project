@@ -108,12 +108,12 @@ def login():
             return redirect('/wrong')
         elif (session["login_type"] == "faculty"):
             return redirect(url_for('faculty'))
-        elif (session["login_type"] == "faculty"):
-            return redirect(url_for('faculty'))
         elif (session["login_type"] == "hod"):
             return redirect(url_for('hod'))
         elif (session["login_type"] == "security"):
             return redirect(url_for('security'))
+        elif (session["login_type"] == "admin"):
+            return redirect(url_for('admin_dashboard'))
 
     if request.method == 'POST':
         username = request.form['username']
@@ -123,7 +123,6 @@ def login():
         session["login_type"] = request.form['login_type']
 
         user_data = None
-        # Only faculty, hod and security logins are allowed now
         if login_type == 'faculty':
             users = db.collection('facultydata').where('username', '==', username).where('password', '==', password).limit(1).stream()
             user_data = next(users, None)
@@ -138,8 +137,10 @@ def login():
         elif login_type == 'security':
             users = db.collection('securitydata').where('username', '==', username).where('password', '==', password).limit(1).stream()
             user_data = next(users, None)
+        elif login_type == 'admin':
+            users = db.collection('admindata').where('username', '==', username).where('password', '==', password).limit(1).stream()
+            user_data = next(users, None)
         else:
-            # student or other roles are no longer supported
             user_data = None
 
         if user_data:
@@ -150,6 +151,8 @@ def login():
                 return redirect(url_for('hod'))
             elif login_type == 'security':
                 return redirect(url_for('security'))
+            elif login_type == 'admin':
+                return redirect(url_for('admin_dashboard'))
         else:
             session["username"] = None
             session["name"] = None
@@ -816,6 +819,281 @@ def stats():
 @app.route('/stats2', methods=['GET', 'POST'])
 def stats2():
     return redirect(url_for('stats'))
+
+# ═══════════════════════════════════════════════════════
+# ADMIN ROUTES
+# ═══════════════════════════════════════════════════════
+
+def _get_role_collection(role):
+    """Map role name to its Firestore collection."""
+    mapping = {
+        'faculty': 'facultydata',
+        'hod': 'hoddata',
+        'security': 'securitydata',
+        'admin': 'admindata',
+    }
+    return mapping.get(role)
+
+
+@app.route('/admin')
+def admin_dashboard():
+    if 'login_type' not in session or session['login_type'] != 'admin':
+        return redirect(url_for('login'))
+
+    current_date = datetime.now().date().strftime('%d-%m-%Y')
+
+    # Compute stats
+    total_faculty = len(list(db.collection('facultydata').stream()))
+    total_hod = len(list(db.collection('hoddata').stream()))
+    total_security = len(list(db.collection('securitydata').stream()))
+    total_admin = len(list(db.collection('admindata').stream()))
+
+    all_requests_docs = list(db.collection('requests').stream())
+    all_requests_list = []
+    pending_count = 0
+    approved_today = 0
+
+    for doc in all_requests_docs:
+        rd = {'_id': doc.id, **doc.to_dict()}
+
+        if rd.get('generated_at'):
+            try:
+                gen_dt = datetime.fromisoformat(rd['generated_at'])
+                rd['check_in_time'] = gen_dt.strftime('%d-%m-%Y %H:%M:%S')
+            except:
+                rd['check_in_time'] = 'N/A'
+        else:
+            rd['check_in_time'] = 'N/A'
+
+        if rd.get('scanned_at'):
+            try:
+                scan_dt = datetime.fromisoformat(rd['scanned_at'])
+                rd['checkout_time_display'] = scan_dt.strftime('%d-%m-%Y %H:%M:%S')
+            except:
+                rd['checkout_time_display'] = 'N/A'
+        else:
+            rd['checkout_time_display'] = 'Not Scanned'
+
+        if rd.get('duration_seconds'):
+            ds = int(rd['duration_seconds'])
+            rd['duration_display'] = f"{ds // 3600}h {(ds % 3600) // 60}m {ds % 60}s"
+        else:
+            rd['duration_display'] = 'N/A'
+
+        if rd.get('status') == 'Pending':
+            pending_count += 1
+        if rd.get('status') == 'Approved' and rd.get('datetime') == current_date:
+            approved_today += 1
+
+        all_requests_list.append(rd)
+
+    # Sort recent first
+    all_requests_list.sort(key=lambda x: x.get('generated_at', '') or '', reverse=True)
+
+    # Activity logs: today's checkouts
+    activity_logs = [r for r in all_requests_list if r.get('checkedout') and r.get('datetime') == current_date]
+
+    stats_data = {
+        'total_faculty': total_faculty,
+        'total_hod': total_hod,
+        'total_security': total_security,
+        'total_admin': total_admin,
+        'approved_today': approved_today,
+        'pending_requests': pending_count,
+    }
+
+    return render_template('admin_dashboard.html',
+                           stats=stats_data,
+                           recent_requests=all_requests_list,
+                           activity_logs=activity_logs)
+
+
+@app.route('/admin/stats')
+def admin_stats_api():
+    if 'login_type' not in session or session['login_type'] != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    current_date = datetime.now().date().strftime('%d-%m-%Y')
+    total_faculty = len(list(db.collection('facultydata').stream()))
+    total_hod = len(list(db.collection('hoddata').stream()))
+    total_security = len(list(db.collection('securitydata').stream()))
+    total_admin = len(list(db.collection('admindata').stream()))
+
+    all_reqs = list(db.collection('requests').stream())
+    pending = sum(1 for d in all_reqs if d.to_dict().get('status') == 'Pending')
+    approved = sum(1 for d in all_reqs if d.to_dict().get('status') == 'Approved' and d.to_dict().get('datetime') == current_date)
+
+    return jsonify({
+        'total_faculty': total_faculty,
+        'total_hod': total_hod,
+        'total_security': total_security,
+        'total_admin': total_admin,
+        'approved_today': approved,
+        'pending_requests': pending,
+    })
+
+
+@app.route('/admin/users')
+def admin_users_api():
+    if 'login_type' not in session or session['login_type'] != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    users = []
+    for role, col in [('faculty', 'facultydata'), ('hod', 'hoddata'), ('security', 'securitydata'), ('admin', 'admindata')]:
+        docs = db.collection(col).stream()
+        for doc in docs:
+            d = doc.to_dict()
+            users.append({'username': d.get('username', ''), 'role': role, 'doc_id': doc.id})
+
+    users.sort(key=lambda u: u['role'])
+    return jsonify({'users': users})
+
+
+@app.route('/admin/add-user', methods=['POST'])
+def admin_add_user():
+    if 'login_type' not in session or session['login_type'] != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    role = data.get('role', '').strip()
+
+    if not username or not password or not role:
+        return jsonify({'success': False, 'message': 'All fields are required'})
+
+    col = _get_role_collection(role)
+    if not col:
+        return jsonify({'success': False, 'message': 'Invalid role'})
+
+    # Check if username already exists in that role collection
+    existing = next(db.collection(col).where('username', '==', username).limit(1).stream(), None)
+    if existing:
+        return jsonify({'success': False, 'message': f'Username "{username}" already exists as {role}'})
+
+    db.collection(col).add({'username': username, 'password': password, 'role': role})
+    return jsonify({'success': True})
+
+
+@app.route('/admin/update-role', methods=['POST'])
+def admin_update_role():
+    if 'login_type' not in session or session['login_type'] != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.get_json()
+    username = data.get('username')
+    current_role = data.get('current_role')
+    new_role = data.get('new_role')
+
+    old_col = _get_role_collection(current_role)
+    new_col = _get_role_collection(new_role)
+    if not old_col or not new_col:
+        return jsonify({'success': False, 'message': 'Invalid role'})
+
+    # Find user in current collection
+    user_doc = next(db.collection(old_col).where('username', '==', username).limit(1).stream(), None)
+    if not user_doc:
+        return jsonify({'success': False, 'message': 'User not found'})
+
+    user_data = user_doc.to_dict()
+
+    # Check if username already exists in the new collection
+    existing = next(db.collection(new_col).where('username', '==', username).limit(1).stream(), None)
+    if existing:
+        return jsonify({'success': False, 'message': f'Username already exists in {new_role} role'})
+
+    # Move: add to new collection, delete from old
+    user_data['role'] = new_role
+    db.collection(new_col).add(user_data)
+    db.collection(old_col).document(user_doc.id).delete()
+
+    return jsonify({'success': True})
+
+
+@app.route('/admin/delete-user', methods=['POST'])
+def admin_delete_user():
+    if 'login_type' not in session or session['login_type'] != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.get_json()
+    username = data.get('username')
+    role = data.get('role')
+
+    col = _get_role_collection(role)
+    if not col:
+        return jsonify({'success': False, 'message': 'Invalid role'})
+
+    user_doc = next(db.collection(col).where('username', '==', username).limit(1).stream(), None)
+    if not user_doc:
+        return jsonify({'success': False, 'message': 'User not found'})
+
+    db.collection(col).document(user_doc.id).delete()
+    return jsonify({'success': True})
+
+
+@app.route('/admin/reset-password', methods=['POST'])
+def admin_reset_password():
+    if 'login_type' not in session or session['login_type'] != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.get_json()
+    username = data.get('username')
+    role = data.get('role')
+    new_password = data.get('new_password', '').strip()
+
+    if not new_password:
+        return jsonify({'success': False, 'message': 'Password cannot be empty'})
+
+    col = _get_role_collection(role)
+    if not col:
+        return jsonify({'success': False, 'message': 'Invalid role'})
+
+    user_doc = next(db.collection(col).where('username', '==', username).limit(1).stream(), None)
+    if not user_doc:
+        return jsonify({'success': False, 'message': 'User not found'})
+
+    db.collection(col).document(user_doc.id).update({'password': new_password})
+    return jsonify({'success': True})
+
+
+@app.route('/admin/all-requests')
+def admin_all_requests():
+    if 'login_type' not in session or session['login_type'] != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    docs = db.collection('requests').stream()
+    requests_list = []
+    for doc in docs:
+        rd = {'_id': doc.id, **doc.to_dict()}
+
+        if rd.get('generated_at'):
+            try:
+                gen_dt = datetime.fromisoformat(rd['generated_at'])
+                rd['check_in_time'] = gen_dt.strftime('%d-%m-%Y %H:%M:%S')
+            except:
+                rd['check_in_time'] = 'N/A'
+        else:
+            rd['check_in_time'] = 'N/A'
+
+        if rd.get('scanned_at'):
+            try:
+                scan_dt = datetime.fromisoformat(rd['scanned_at'])
+                rd['checkout_time_display'] = scan_dt.strftime('%d-%m-%Y %H:%M:%S')
+            except:
+                rd['checkout_time_display'] = 'N/A'
+        else:
+            rd['checkout_time_display'] = 'Not Scanned'
+
+        if rd.get('duration_seconds'):
+            ds = int(rd['duration_seconds'])
+            rd['duration_display'] = f"{ds // 3600}h {(ds % 3600) // 60}m {ds % 60}s"
+        else:
+            rd['duration_display'] = 'N/A'
+
+        requests_list.append(rd)
+
+    requests_list.sort(key=lambda x: x.get('generated_at', '') or '', reverse=True)
+    return jsonify({'requests': requests_list})
 
 @app.route('/wrong')
 def wrong():

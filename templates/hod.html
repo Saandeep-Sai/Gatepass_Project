@@ -521,23 +521,23 @@
       function downloadMonthlyPDF() {
           const month = document.getElementById('month-select').value;
           const year = document.getElementById('year-select').value;
-          
+
           // Create a form and submit to trigger PDF download
           const form = document.createElement('form');
           form.method = 'POST';
           form.action = '/hod/download-monthly-report';
           form.style.display = 'none';
-          
+
           const monthInput = document.createElement('input');
           monthInput.name = 'month';
           monthInput.value = month;
           form.appendChild(monthInput);
-          
+
           const yearInput = document.createElement('input');
           yearInput.name = 'year';
           yearInput.value = year;
           form.appendChild(yearInput);
-          
+
           document.body.appendChild(form);
           form.submit();
           document.body.removeChild(form);
